@@ -65,9 +65,9 @@ export default {
     queued: "In Queue",
     update: "Update",
     updating: "Updating...",
+    source: "Source: {source}",
     loadMore: "Load More",
-    meta: "{author} · ★ {stars} · {installs} installs",
-    source: "Source: {source}"
+    unavailable: "Unavailable"
   },
   local: {
     title: "Local Skills",

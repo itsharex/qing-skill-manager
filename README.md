@@ -4,9 +4,9 @@
 
 **Multi-market aggregated search, one-click install to 10+ AI IDEs.** A cross-platform skills manager that lets you search skills from multiple marketplaces (Claude Plugins, SkillsLLM, SkillsMP), download to a local repository, and install to any AI-powered IDE with a single click.
 
-![Local](docs/screenshots/local.png)
-![Market](docs/screenshots/market.png)
-![IDE](docs/screenshots/ide.png)
+![Local](docs/screenshots/en-US/local.png)
+![Market](docs/screenshots/en-US/market.png)
+![IDE](docs/screenshots/en-US/ide.png)
 
 ## Core Features
 

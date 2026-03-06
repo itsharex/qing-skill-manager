@@ -200,7 +200,7 @@ export function useSkillsManager() {
     return Array.from(map.values());
   }
 
-  function addToDownloadQueue(skill: RemoteSkill) {
+  function addToDownloadQueue(skill: RemoteSkill, action: "download" | "update" = "download") {
     // Check if already in queue
     if (downloadQueue.value.some(t => t.id === skill.id)) {
       return;
@@ -209,6 +209,7 @@ export function useSkillsManager() {
       id: skill.id,
       name: skill.name,
       sourceUrl: skill.sourceUrl,
+      action,
       status: 'pending'
     });
     processQueue();
@@ -225,7 +226,11 @@ export function useSkillsManager() {
       task.status = 'downloading';
       try {
         const installBaseDir = await buildInstallBaseDir();
-        await invoke("download_marketplace_skill", {
+        const command = task.action === "update"
+          ? "update_marketplace_skill"
+          : "download_marketplace_skill";
+
+        await invoke(command, {
           request: {
             sourceUrl: task.sourceUrl,
             skillName: task.name,
@@ -264,37 +269,13 @@ export function useSkillsManager() {
     }
   }
 
-  // Keep original downloadSkill for backward compatibility (called by updateSkill)
+  // Keep original downloadSkill for backward compatibility
   async function downloadSkill(skill: RemoteSkill) {
-    addToDownloadQueue(skill);
+    addToDownloadQueue(skill, "download");
   }
 
   async function updateSkill(skill: RemoteSkill) {
-    if (updatingId.value) return;
-
-    updatingId.value = skill.id;
-    busy.value = true;
-    busyText.value = t("market.updating");
-
-    try {
-      const installBaseDir = await buildInstallBaseDir();
-      const result = (await invoke("update_marketplace_skill", {
-        request: {
-          sourceUrl: skill.sourceUrl,
-          skillName: skill.name,
-          installBaseDir
-        }
-      })) as { installedPath: string };
-
-      toast.success(t("messages.updated", { path: result.installedPath }));
-      await scanLocalSkills();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("errors.updateFailed"));
-    } finally {
-      updatingId.value = null;
-      busy.value = false;
-      busyText.value = "";
-    }
+    addToDownloadQueue(skill, "update");
   }
 
   async function scanLocalSkills() {

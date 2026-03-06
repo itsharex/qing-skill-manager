@@ -19,8 +19,12 @@ pub fn download_bytes(url: &str, headers: &[(&str, &str)]) -> Result<Vec<u8>, St
 
     let response = request.call().map_err(|err| err.to_string())?;
     let mut buf = Vec::new();
+
+    // 限制最大下载大小为 50MB (防止 OOM)
+    const MAX_DOWNLOAD_SIZE: u64 = 50 * 1024 * 1024;
     response
         .into_reader()
+        .take(MAX_DOWNLOAD_SIZE)
         .read_to_end(&mut buf)
         .map_err(|err| err.to_string())?;
     Ok(buf)
@@ -51,11 +55,27 @@ pub fn download_skill_to_dir(
         }
     }
 
-    let zip_url = format!(
-        "https://github-zip-api.val.run/zip?source={}",
-        urlencoding::encode(source_url)
-    );
-    let zip_buf = download_bytes(&zip_url, &[])?;
+    let zip_url = if source_url.starts_with("https://github.com/") {
+        let parts: Vec<&str> = source_url["https://github.com/".len()..].split('/').collect();
+        if parts.len() >= 2 {
+            let owner = parts[0];
+            let repo = parts[1].strip_suffix(".git").unwrap_or(parts[1]);
+            format!("https://api.github.com/repos/{}/{}/zipball/HEAD", owner, repo)
+        } else {
+            source_url.to_string()
+        }
+    } else {
+        source_url.to_string()
+    };
+
+    let zip_buf = download_bytes(
+        &zip_url,
+        &[
+            ("Accept", "application/vnd.github+json"),
+            ("X-GitHub-Api-Version", "2022-11-28"),
+            ("User-Agent", "skills-manager-gui/0.1"),
+        ],
+    )?;
 
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -109,11 +129,11 @@ pub fn extract_zip(buf: &[u8], extract_dir: &Path) -> Result<(), String> {
         .unwrap_or_else(|_| extract_dir.to_path_buf());
 
     for i in 0..zip.len() {
-        let mut file = zip.by_index(i).map_err(|err| err.to_string())?;
+        let file = zip.by_index(i).map_err(|err| err.to_string())?;
         let Some(enclosed) = file.enclosed_name() else {
             continue;
         };
-        let out_path = extract_dir.join(&enclosed);
+        let out_path = canonical_extract.join(&enclosed);
 
         if !is_within_directory(&canonical_extract, &out_path) {
             return Err(format!(
@@ -132,7 +152,10 @@ pub fn extract_zip(buf: &[u8], extract_dir: &Path) -> Result<(), String> {
             fs::create_dir_all(parent).map_err(|err| err.to_string())?;
         }
         let mut outfile = fs::File::create(&out_path).map_err(|err| err.to_string())?;
-        std::io::copy(&mut file, &mut outfile).map_err(|err| err.to_string())?;
+        
+        // 防御 Zip Bomb: 每个文件最多解压 100MB
+        const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024;
+        std::io::copy(&mut file.take(MAX_FILE_SIZE), &mut outfile).map_err(|err| err.to_string())?;
     }
 
     Ok(())

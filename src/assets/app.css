@@ -339,6 +339,12 @@ body {
   margin: 10px 0 0;
   font-size: 14px;
   color: var(--color-desc);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-source {
@@ -476,6 +482,7 @@ body {
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(250%);
   }

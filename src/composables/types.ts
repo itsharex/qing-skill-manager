@@ -89,6 +89,7 @@ export type DownloadTask = {
   id: string;
   name: string;
   sourceUrl: string;
+  action: "download" | "update";
   status: "pending" | "downloading" | "done" | "error";
   error?: string;
 };

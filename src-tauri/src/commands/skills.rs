@@ -175,7 +175,7 @@ fn create_junction_dir(target: &Path, link: &Path) -> Result<(), String> {
 
     fn validate_path(path: &Path) -> Result<(), String> {
         let path_str = path.to_string_lossy();
-        let dangerous_chars = ['|', '^', '<', '>', '%', '!', '"'];
+        let dangerous_chars = ['|', '^', '<', '>', '%', '!', '"', '&', '(', ')', ';'];
         for ch in dangerous_chars {
             if path_str.contains(ch) {
                 return Err(format!("Path contains dangerous character: '{}'", ch));
@@ -232,6 +232,35 @@ pub fn link_local_skill(request: LinkRequest) -> Result<InstallResult, String> {
         let target_canon = fs::canonicalize(&target_base).unwrap_or_else(|_| normalized_target.clone());
         if !target_canon.starts_with(&normalized_home) {
             return Err(format!("目标目录存在符号链接攻击风险：{}", target.name));
+        }
+
+        // 防御任意目录软链攻击：仅允许往指定的白名单应用目录下注入技能
+        let allowed_ide_dirs = [
+            ".skills-manager",
+            ".gemini",
+            ".claude",
+            ".codebuddy",
+            ".codex",
+            ".cursor",
+            ".kiro",
+            ".qoder",
+            ".trae",
+            ".github",
+            ".windsurf",
+            ".openclaw",
+            ".config",
+        ];
+
+        let mut is_allowed_base = false;
+        for allowed_dir in allowed_ide_dirs.iter() {
+            if normalized_target.starts_with(normalized_home.join(allowed_dir)) {
+                is_allowed_base = true;
+                break;
+            }
+        }
+
+        if !is_allowed_base {
+            return Err(format!("目标目录不在支持的 IDE 技能安装范围内：{}", target.name));
         }
 
         fs::create_dir_all(&target_base).map_err(|err| err.to_string())?;

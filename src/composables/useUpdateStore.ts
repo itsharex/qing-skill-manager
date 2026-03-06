@@ -31,7 +31,7 @@ export function useUpdateStore() {
       currentVersion.value = await getVersion();
     } catch {
       appName.value = "Skills Manager";
-      currentVersion.value = "0.3.1";
+      currentVersion.value = "0.3.5";
     }
   };
 

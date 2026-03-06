@@ -4,9 +4,9 @@
 
 **多市场聚合搜索，一键安装到 10+ AI IDE。** 跨平台 Skills 管理器，支持从多个技能市场（Claude Plugins、SkillsLLM、SkillsMP）聚合搜索，下载到本地仓库，一键安装到任意 AI IDE。
 
-![Local](docs/screenshots/local.png)
-![Market](docs/screenshots/market.png)
-![IDE](docs/screenshots/ide.png)
+![Local](docs/screenshots/zh-CN/local.png)
+![Market](docs/screenshots/zh-CN/market.png)
+![IDE](docs/screenshots/zh-CN/ide.png)
 
 ## 核心功能
 

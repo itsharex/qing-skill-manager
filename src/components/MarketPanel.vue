@@ -78,17 +78,18 @@ const showSettings = ref(false);
             </div>
           </div>
           <template v-if="localSkillNameSet.has(skill.name.trim().toLowerCase())">
-            <button class="ghost" :disabled="updatingId === skill.id" @click="$emit('update', skill)">
-              {{ updatingId === skill.id ? t("market.updating") : t("market.update") }}
+            <button class="ghost" :disabled="downloadingIds.has(skill.id) || !skill.sourceUrl || !skill.sourceUrl.trim()" :title="(!skill.sourceUrl || !skill.sourceUrl.trim()) ? t('market.unavailable') : ''" @click="$emit('update', skill)">
+              {{ (!skill.sourceUrl || !skill.sourceUrl.trim()) ? t("market.unavailable") : (downloadingIds.has(skill.id) ? t("market.queued") : t("market.update")) }}
             </button>
           </template>
           <template v-else>
             <button 
               class="primary" 
-              :disabled="downloadingIds.has(skill.id)" 
+              :disabled="downloadingIds.has(skill.id) || !skill.sourceUrl || !skill.sourceUrl.trim()" 
+              :title="(!skill.sourceUrl || !skill.sourceUrl.trim()) ? t('market.unavailable') : ''"
               @click="$emit('download', skill)"
             >
-              {{ downloadingIds.has(skill.id) ? t("market.queued") : t("market.download") }}
+              {{ (!skill.sourceUrl || !skill.sourceUrl.trim()) ? t("market.unavailable") : (downloadingIds.has(skill.id) ? t("market.queued") : t("market.download")) }}
             </button>
           </template>
         </div>

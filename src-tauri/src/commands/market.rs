@@ -64,9 +64,9 @@ fn parse_skillsllm(
     let mut skills = Vec::new();
     if let Some(items) = list {
         for item in items {
-            let github_owner = get_value_string(item, &["githubOwner", "github_owner", "owner"]);
-            let github_repo = get_value_string(item, &["githubRepo", "github_repo", "repo"]);
-            let source_url = get_value_string(item, &["githubUrl", "sourceUrl", "source_url"])
+            let github_owner = get_value_string(item, &["githubOwner", "github_owner", "owner", "repoOwner"]);
+            let github_repo = get_value_string(item, &["githubRepo", "github_repo", "repo", "repoName"]);
+            let source_url = get_value_string(item, &["githubUrl", "sourceUrl", "source_url", "repoUrl"])
                 .or_else(|| match (github_owner.as_deref(), github_repo.as_deref()) {
                     (Some(o), Some(r)) => Some(build_github_source_url(o, r)),
                     _ => None,
@@ -281,6 +281,8 @@ pub async fn search_marketplaces(
         } else {
             format!("q={}", urlencoding::encode(trimmed))
         };
+        
+        let limit = if limit == 0 { 20 } else { limit };
 
         let claude_market_id = "claude-plugins";
         let claude_market_label = "Claude Plugins";
@@ -347,7 +349,7 @@ pub async fn search_marketplaces(
             let skillsllm_page = (offset / limit).saturating_add(1);
             let mut skillsllm_url = String::from("https://skillsllm.com/api/skills?");
             if !query_param.is_empty() {
-                skillsllm_url.push_str(&format!("search={}&", urlencoding::encode(trimmed)));
+                skillsllm_url.push_str(&format!("q={}&", urlencoding::encode(trimmed)));
             }
             skillsllm_url.push_str(&format!("page={}&limit={}", skillsllm_page, limit));
 
@@ -509,6 +511,9 @@ pub async fn download_marketplace_skill(
 pub async fn update_marketplace_skill(request: DownloadRequest) -> Result<DownloadResult, String> {
     if request.install_base_dir.trim().is_empty() {
         return Err("安装目录不能为空".to_string());
+    }
+    if request.source_url.trim().is_empty() {
+        return Err("缺少有效的源码地址 (Source URL)，无法更新".to_string());
     }
 
     let source_url = request.source_url.clone();
