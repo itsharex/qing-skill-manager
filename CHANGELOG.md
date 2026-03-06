@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.9](https://github.com/Rito-w/skills-manager/compare/v0.3.8...v0.3.9) (2026-03-06)
+
+
+### Bug Fixes
+
+* install webkit 4.1 deps for linux updater builds ([35ccdb6](https://github.com/Rito-w/skills-manager/commit/35ccdb654339cebf093f0d82a546d10a9acf66dc))
+
 ### [0.3.8](https://github.com/Rito-w/skills-manager/compare/v0.3.7...v0.3.8) (2026-03-06)
 
 
