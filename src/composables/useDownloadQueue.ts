@@ -26,7 +26,7 @@ export function useDownloadQueue(callbacks: DownloadQueueCallbacks = {}) {
     return join(home, ".skills-manager/skills");
   }
 
-  function addToDownloadQueue(skill: RemoteSkill) {
+  function addToDownloadQueue(skill: RemoteSkill, action: "download" | "update" = "download") {
     // Check if already in queue (including active downloading tasks)
     if (downloadQueue.value.some((t) => t.id === skill.id && (t.status === "pending" || t.status === "downloading"))) {
       return;
@@ -35,6 +35,7 @@ export function useDownloadQueue(callbacks: DownloadQueueCallbacks = {}) {
       id: skill.id,
       name: skill.name,
       sourceUrl: skill.sourceUrl,
+      action,
       status: "pending",
     });
     processQueue();
@@ -51,7 +52,11 @@ export function useDownloadQueue(callbacks: DownloadQueueCallbacks = {}) {
       task.status = "downloading";
       try {
         const installBaseDir = await buildInstallBaseDir();
-        await invoke("download_marketplace_skill", {
+        const command = task.action === "update"
+          ? "update_marketplace_skill"
+          : "download_marketplace_skill";
+
+        await invoke(command, {
           request: {
             sourceUrl: task.sourceUrl,
             skillName: task.name,
