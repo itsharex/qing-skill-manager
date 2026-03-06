@@ -70,6 +70,7 @@ jobs:
         run: pnpm tauri build --target ${{ matrix.target }}
 
       - name: Stage release assets
+        shell: bash
         run: |
           node .github/scripts/stage-release-assets.js \
             "src-tauri/target/${{ matrix.target }}/release/bundle" \
