@@ -2,6 +2,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir, join } from "@tauri-apps/api/path";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useToast } from "./useToast";
 import type {
   RemoteSkill, MarketStatus, InstallResult, LocalSkill,
@@ -509,6 +510,34 @@ export function useSkillsManager() {
     }
   }
 
+  async function openSkillDirectory(path: string) {
+    try {
+      await revealItemInDir(path);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("errors.openDirFailed"));
+    }
+  }
+
+  async function adoptIdeSkill(skill: IdeSkill) {
+    busy.value = true;
+    busyText.value = t("messages.adopting");
+    try {
+      const message = (await invoke("adopt_ide_skill", {
+        request: {
+          targetPath: skill.path,
+          ideLabel: skill.ide
+        }
+      })) as string;
+      toast.success(message);
+      await scanLocalSkills();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("errors.adoptFailed"));
+    } finally {
+      busy.value = false;
+      busyText.value = "";
+    }
+  }
+
   onMounted(() => {
     refreshIdeOptions();
     loadMarketConfigs();
@@ -569,6 +598,8 @@ export function useSkillsManager() {
     confirmUninstall,
     cancelUninstall,
     importLocalSkill,
+    openSkillDirectory,
+    adoptIdeSkill,
     addToDownloadQueue,
     removeFromQueue,
     retryDownload

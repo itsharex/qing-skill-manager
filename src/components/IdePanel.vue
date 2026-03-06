@@ -22,6 +22,8 @@ defineEmits<{
   (e: "addCustomIde"): void;
   (e: "removeCustomIde", label: string): void;
   (e: "uninstall", path: string): void;
+  (e: "openDir", path: string): void;
+  (e: "adopt", skill: IdeSkill): void;
 }>();
 </script>
 
@@ -69,15 +71,40 @@ defineEmits<{
     <div v-if="localLoading" class="hint">{{ t("ide.loading") }}</div>
     <div v-if="!localLoading && filteredIdeSkills.length === 0" class="hint">{{ t("ide.emptyHint") }}</div>
     <div v-if="filteredIdeSkills.length > 0" class="cards">
-      <article v-for="(skill, index) in filteredIdeSkills" :key="skill.id" class="card">
+      <article
+        v-for="(skill, index) in filteredIdeSkills"
+        :key="skill.id"
+        class="card"
+        :class="{ unmanaged: !skill.managed }"
+      >
         <div class="card-header">
           <div>
-            <div class="card-title">{{ index + 1 }}. {{ skill.name }}</div>
+            <div class="card-title-row">
+              <div class="card-title">{{ index + 1 }}. {{ skill.name }}</div>
+              <span v-if="!skill.managed" class="status-badge unmanaged">
+                {{ t("ide.unmanaged") }}
+              </span>
+            </div>
             <div class="card-meta">
-              {{ skill.ide }} · {{ skill.source === "link" ? t("ide.sourceLink") : t("ide.sourceLocal") }}
+              {{
+                skill.ide +
+                " · " +
+                (skill.source === "link" ? t("ide.sourceLink") : t("ide.sourceLocal")) +
+                (!skill.managed ? ` · ${t("ide.unmanaged")}` : "")
+              }}
             </div>
           </div>
-          <button class="ghost" @click="$emit('uninstall', skill.path)">{{ t("ide.uninstall") }}</button>
+          <div class="card-actions">
+            <button class="ghost" @click="$emit('openDir', skill.path)">{{ t("ide.openDir") }}</button>
+            <button
+              v-if="!skill.managed"
+              class="ghost"
+              @click="$emit('adopt', skill)"
+            >
+              {{ t("ide.adopt") }}
+            </button>
+            <button class="ghost" @click="$emit('uninstall', skill.path)">{{ t("ide.uninstall") }}</button>
+          </div>
         </div>
         <div class="card-link">{{ skill.path }}</div>
       </article>
@@ -107,5 +134,38 @@ defineEmits<{
   background: var(--color-primary-bg);
   border-color: var(--color-primary-bg);
   color: var(--color-primary-text);
+}
+
+.card.unmanaged {
+  border-color: rgba(245, 158, 11, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.22);
+}
+
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.card-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.status-badge.unmanaged {
+  color: #8a4b00;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.28);
 }
 </style>

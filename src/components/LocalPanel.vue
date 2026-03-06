@@ -18,6 +18,7 @@ const emit = defineEmits<{
   (e: "install", skill: LocalSkill): void;
   (e: "installMany", skills: LocalSkill[]): void;
   (e: "deleteLocal", skills: LocalSkill[]): void;
+  (e: "openDir", path: string): void;
   (e: "refresh"): void;
   (e: "import"): void;
   (e: "retryDownload", taskId: string): void;
@@ -25,6 +26,16 @@ const emit = defineEmits<{
 }>();
 
 const selectedIds = ref<string[]>([]);
+const searchQuery = ref("");
+
+const filteredLocalSkills = computed(() => {
+  const keyword = searchQuery.value.trim().toLowerCase();
+  if (!keyword) return props.localSkills;
+  return props.localSkills.filter((skill) => {
+    const haystacks = [skill.name, skill.description, skill.path];
+    return haystacks.some((value) => value.toLowerCase().includes(keyword));
+  });
+});
 
 watch(
   () => props.localSkills,
@@ -36,15 +47,22 @@ watch(
 );
 
 const selectedSkills = computed(() =>
-  props.localSkills.filter((skill) => selectedIds.value.includes(skill.id))
+  filteredLocalSkills.value.filter((skill) => selectedIds.value.includes(skill.id))
 );
 
 const allSelected = computed(
-  () => props.localSkills.length > 0 && selectedIds.value.length === props.localSkills.length
+  () =>
+    filteredLocalSkills.value.length > 0 &&
+    filteredLocalSkills.value.every((skill) => selectedIds.value.includes(skill.id))
 );
 
 function toggleSelectAll(checked: boolean) {
-  selectedIds.value = checked ? props.localSkills.map((skill) => skill.id) : [];
+  const filteredIds = filteredLocalSkills.value.map((skill) => skill.id);
+  if (checked) {
+    selectedIds.value = Array.from(new Set([...selectedIds.value, ...filteredIds]));
+    return;
+  }
+  selectedIds.value = selectedIds.value.filter((id) => !filteredIds.includes(id));
 }
 
 function toggleSelected(skillId: string, checked: boolean) {
@@ -81,11 +99,21 @@ function deleteSelected() {
         <input
           type="checkbox"
           :checked="allSelected"
-          :disabled="localSkills.length === 0"
+          :disabled="filteredLocalSkills.length === 0"
           @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
         />
         {{ t("local.selectAll") }}
       </label>
+    </div>
+    <div class="search-row">
+      <input
+        v-model="searchQuery"
+        class="input"
+        :placeholder="t('local.searchPlaceholder')"
+      />
+      <div class="hint search-summary">
+        {{ t("local.filteredTotal", { shown: filteredLocalSkills.length, total: localSkills.length }) }}
+      </div>
     </div>
     <div class="actions">
       <div class="buttons">
@@ -119,8 +147,16 @@ function deleteSelected() {
 
     <div v-if="localLoading" class="hint">{{ t("local.scanning") }}</div>
     <div v-if="!localLoading && localSkills.length === 0" class="hint">{{ t("local.emptyHint") }}</div>
-    <div v-if="localSkills.length > 0" class="cards">
-      <article v-for="(skill, index) in localSkills" :key="skill.id" class="card local-card" :class="{ linked: skill.usedBy.length > 0 }">
+    <div v-else-if="!localLoading && filteredLocalSkills.length === 0" class="hint">
+      {{ t("local.searchEmptyHint") }}
+    </div>
+    <div v-if="filteredLocalSkills.length > 0" class="cards">
+      <article
+        v-for="(skill, index) in filteredLocalSkills"
+        :key="skill.id"
+        class="card local-card"
+        :class="{ linked: skill.usedBy.length > 0 }"
+      >
         <div class="card-header">
           <div class="card-title-row">
             <label class="checkbox card-select">
@@ -133,17 +169,16 @@ function deleteSelected() {
             <div>
               <div class="card-title">{{ index + 1 }}. {{ skill.name }}</div>
               <div class="card-meta">
-                {{
-                  skill.usedBy.length > 0
-                    ? t("local.usedBy", { ideList: skill.usedBy.join(" / ") })
-                    : t("local.unused")
-                }}
+                {{ skill.usedBy.length > 0 ? t("local.linked") : t("local.unused") }}
               </div>
             </div>
           </div>
           <div class="card-actions">
             <button class="primary" :disabled="installingId === skill.id" @click="$emit('install', skill)">
             {{ installingId === skill.id ? t("local.processing") : t("local.install") }}
+            </button>
+            <button class="ghost" @click="$emit('openDir', skill.path)">
+              {{ t("local.openDir") }}
             </button>
             <button class="ghost danger" @click="$emit('deleteLocal', [skill])">
               {{ t("local.deleteOne") }}
@@ -183,6 +218,22 @@ function deleteSelected() {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
+}
+
+.search-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.search-row .input {
+  flex: 1 1 280px;
+}
+
+.search-summary {
+  white-space: nowrap;
 }
 
 .select-all {

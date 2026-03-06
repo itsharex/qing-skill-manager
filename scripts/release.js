@@ -19,7 +19,9 @@ const root = process.cwd();
 const pkgPath = path.join(root, "package.json");
 const tauriPath = path.join(root, "src-tauri/tauri.conf.json");
 const cargoPath = path.join(root, "src-tauri/Cargo.toml");
+const cargoLockPath = path.join(root, "src-tauri/Cargo.lock");
 const bundleDir = path.join(root, "src-tauri/target/release/bundle");
+const releaseNotesPath = path.join(root, ".github/release-notes.md");
 
 function run(command, options = {}) {
   execSync(command, {
@@ -50,6 +52,15 @@ function bumpVersion(nextVersion) {
   const cargo = fs.readFileSync(cargoPath, "utf8");
   const nextCargo = cargo.replace(/^version = ".*"$/m, `version = "${nextVersion}"`);
   fs.writeFileSync(cargoPath, nextCargo);
+
+  if (fs.existsSync(cargoLockPath)) {
+    const cargoLock = fs.readFileSync(cargoLockPath, "utf8");
+    const nextCargoLock = cargoLock.replace(
+      /(name = "skills-manager-gui"\nversion = ").*(")/,
+      `$1${nextVersion}$2`
+    );
+    fs.writeFileSync(cargoLockPath, nextCargoLock);
+  }
 }
 
 function ensureSigningEnv() {
@@ -228,8 +239,15 @@ function ensureGhCli() {
   }
 }
 
+function ensureReleaseNotes() {
+  if (!fs.existsSync(releaseNotesPath)) {
+    throw new Error(`缺少发布说明模板：${releaseNotesPath}`);
+  }
+}
+
 function publishRelease(nextVersion, assets) {
   ensureGhCli();
+  ensureReleaseNotes();
 
   const tag = `v${nextVersion}`;
   const quotedAssets = assets.map((asset) => `"${asset}"`).join(" ");
@@ -241,11 +259,12 @@ function publishRelease(nextVersion, assets) {
   }
 
   if (!releaseExists) {
-    run(`gh release create ${tag} ${quotedAssets} --title "${tag}" --generate-notes`);
+    run(`gh release create ${tag} ${quotedAssets} --title "${tag}" --notes-file "${releaseNotesPath}"`);
     return;
   }
 
   run(`gh release upload ${tag} ${quotedAssets} --clobber`);
+  run(`gh release edit ${tag} --title "${tag}" --notes-file "${releaseNotesPath}"`);
 }
 
 console.log(`Updated version to ${version}`);
@@ -269,7 +288,7 @@ if (shouldPublish) {
 
 if (shouldPush) {
   const tag = `v${version}`;
-  run("git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml");
+  run("git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock");
   try {
     run(`git commit -m "chore(release): v${version}"`);
   } catch {

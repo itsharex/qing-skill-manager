@@ -122,7 +122,7 @@ jobs:
         shell: bash
         run: |
           if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release create "${GITHUB_REF_NAME}" --title "Skills Manager ${GITHUB_REF_NAME}" --notes "Automated release."
+            gh release create "${GITHUB_REF_NAME}" --title "Skills Manager ${GITHUB_REF_NAME}" --notes-file ".github/release-notes.md"
           fi
 
       - name: Upload release assets
@@ -132,3 +132,12 @@ jobs:
         run: |
           mapfile -t files < <(find artifacts -type f | sort)
           gh release upload "${GITHUB_REF_NAME}" "${files[@]}" "latest.json" --clobber
+
+      - name: Sync release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release edit "${GITHUB_REF_NAME}" \
+            --title "Skills Manager ${GITHUB_REF_NAME}" \
+            --notes-file ".github/release-notes.md"

@@ -75,19 +75,23 @@ export default {
     title: "Local Skills",
     hint: "To import local skills, select the folder containing SKILL.md.",
     total: "Total {count}",
+    filteredTotal: "Showing {shown} / {total}",
     selectAll: "Select all",
+    searchPlaceholder: "Search name, description or path",
     scanning: "Scanning local skills...",
     emptyHint: "No local skills found. Try downloading some from the Market.",
+    searchEmptyHint: "No matching skills",
     install: "Install to IDE",
     installSelected: "Batch install to IDE ({count})",
     import: "Import Local Skill",
+    openDir: "Open Folder",
     deleteOne: "Delete",
     deleteSelected: "Delete selected ({count})",
     deleteSelectedCount: "{count} skills selected",
     deleteAll: "Delete all",
     selectSkillDir: "Select Skill Directory",
     processing: "Processing...",
-    usedBy: "Linked to {ideList}",
+    linked: "Linked",
     unused: "Not linked"
   },
   ide: {
@@ -103,6 +107,9 @@ export default {
     emptyHint: "No skills for this IDE",
     sourceLink: "Linked",
     sourceLocal: "Local",
+    unmanaged: "Unmanaged",
+    openDir: "Open Folder",
+    adopt: "Manage Centrally",
     uninstall: "Uninstall"
   },
   installModal: {
@@ -132,6 +139,7 @@ export default {
     uninstalling: "Uninstalling...",
     deleting: "Deleting...",
     importing: "Importing...",
+    adopting: "Adding to central management...",
     handled: "Handled {linked} targets, skipped {skipped} targets.",
     imported: "Successfully imported {success} skills, failed {failed}."
   },
@@ -148,6 +156,8 @@ export default {
     uninstallFailed: "Uninstallation failed.",
     deleteFailed: "Deletion failed.",
     importFailed: "Import failed.",
+    openDirFailed: "Failed to open folder.",
+    adoptFailed: "Failed to add to central management.",
     invalidPath: "Path must be a relative path under your home directory."
   },
   update: {

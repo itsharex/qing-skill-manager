@@ -97,6 +97,8 @@ const {
   confirmUninstall,
   cancelUninstall,
   importLocalSkill,
+  openSkillDirectory,
+  adoptIdeSkill,
   marketConfigs,
   marketStatuses,
   enabledMarkets,
@@ -190,6 +192,7 @@ const { updateAvailable, checkOnStartup } = useUpdateStore();
           @install="openInstallModal"
           @install-many="openInstallModal"
           @delete-local="openDeleteLocalModal"
+          @open-dir="openSkillDirectory"
           @refresh="scanLocalSkills"
           @import="importLocalSkill"
           @retry-download="retryDownload"
@@ -234,6 +237,8 @@ const { updateAvailable, checkOnStartup } = useUpdateStore();
           @update:custom-ide-dir="customIdeDir = $event"
           @add-custom-ide="addCustomIde"
           @remove-custom-ide="removeCustomIde"
+          @open-dir="openSkillDirectory"
+          @adopt="adoptIdeSkill"
           @uninstall="openUninstallModal"
         />
       </template>

@@ -1,13 +1,12 @@
 use crate::types::{
-    DeleteLocalSkillRequest, IdeSkill, ImportRequest, InstallResult, LinkRequest,
-    LocalScanRequest, LocalSkill, Overview, UninstallRequest,
+    AdoptIdeSkillRequest, DeleteLocalSkillRequest, IdeSkill, ImportRequest, InstallResult,
+    LinkRequest, LocalScanRequest, LocalSkill, Overview, UninstallRequest,
 };
 use crate::utils::download::copy_dir_recursive;
 use crate::utils::path::{normalize_path, resolve_canonical, sanitize_dir_name};
 use crate::utils::security::is_safe_relative_dir;
 use std::fs;
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
 
 fn read_skill_metadata(skill_dir: &Path) -> (String, String) {
     let name = skill_dir
@@ -58,19 +57,21 @@ fn collect_skills_from_dir(base: &Path, source: &str, ide: Option<&str>) -> Vec<
         return skills;
     }
 
-    for entry in WalkDir::new(base).max_depth(4) {
+    let entries = match fs::read_dir(base) {
+        Ok(entries) => entries,
+        Err(_) => return skills,
+    };
+
+    for entry in entries {
         let entry = match entry {
             Ok(item) => item,
             Err(_) => continue,
         };
-        if !entry.file_type().is_file() || entry.file_name() != "SKILL.md" {
+        let path = entry.path();
+        if !path.is_dir() || !path.join("SKILL.md").exists() {
             continue;
         }
-        let Some(skill_dir) = entry.path().parent() else {
-            continue;
-        };
-        let (name, description) = read_skill_metadata(skill_dir);
-        let path = skill_dir.to_path_buf();
+        let (name, description) = read_skill_metadata(&path);
         skills.push(LocalSkill {
             id: path.display().to_string(),
             name,
@@ -96,16 +97,26 @@ fn collect_ide_skills(
         return skills;
     }
 
-    for entry in WalkDir::new(base).max_depth(3).follow_links(false) {
+    let entries = match fs::read_dir(base) {
+        Ok(entries) => entries,
+        Err(_) => return skills,
+    };
+
+    for entry in entries {
         let entry = match entry {
             Ok(item) => item,
             Err(_) => continue,
         };
-        let file_type = entry.file_type();
+        let path = entry.path();
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(_) => continue,
+        };
+        let file_type = metadata.file_type();
         if !file_type.is_dir() && !file_type.is_symlink() {
             continue;
         }
-        let skill_dir = entry.path();
+        let skill_dir = path.as_path();
         if !skill_dir.join("SKILL.md").exists() {
             continue;
         }
@@ -145,10 +156,26 @@ fn collect_ide_skills(
             path: path.display().to_string(),
             ide: ide_label.to_string(),
             source: source.to_string(),
+            managed: source == "link",
         });
     }
 
     skills
+}
+
+fn remove_path(path: &Path) -> Result<(), String> {
+    let metadata = fs::symlink_metadata(path).map_err(|err| err.to_string())?;
+    if metadata.file_type().is_symlink() {
+        if path.is_dir() {
+            fs::remove_dir(path).map_err(|err| err.to_string())
+        } else {
+            fs::remove_file(path).map_err(|err| err.to_string())
+        }
+    } else if metadata.is_dir() {
+        fs::remove_dir_all(path).map_err(|err| err.to_string())
+    } else {
+        fs::remove_file(path).map_err(|err| err.to_string())
+    }
 }
 
 fn is_symlink_to(path: &Path, target: &Path) -> bool {
@@ -470,6 +497,59 @@ pub fn import_local_skill(request: ImportRequest) -> Result<String, String> {
     copy_dir_recursive(&source_path, &target_dir)?;
 
     Ok(format!("已导入 Skill: {}", name))
+}
+
+#[tauri::command]
+pub fn adopt_ide_skill(request: AdoptIdeSkillRequest) -> Result<String, String> {
+    let home = dirs::home_dir().ok_or("无法获取用户目录")?;
+    let normalized_home = normalize_path(&home);
+    let manager_root = home.join(".skills-manager/skills");
+    fs::create_dir_all(&manager_root).map_err(|err| err.to_string())?;
+
+    let target = PathBuf::from(&request.target_path);
+    let target_canon = fs::canonicalize(&target).map_err(|_| "IDE Skill 路径不存在".to_string())?;
+    if !target_canon.starts_with(&normalized_home) {
+        return Err("IDE Skill 路径必须位于用户目录下".to_string());
+    }
+    if !target_canon.join("SKILL.md").exists() {
+        return Err("目标目录缺少 SKILL.md，无法纳入统一管理".to_string());
+    }
+
+    let (name, _) = read_skill_metadata(&target_canon);
+    let safe_name = sanitize_dir_name(&name);
+    let manager_target = manager_root.join(&safe_name);
+
+    if manager_target.exists() {
+        let manager_canon = fs::canonicalize(&manager_target).map_err(|err| err.to_string())?;
+        if manager_canon == target_canon {
+            return Ok(format!("{} 已在统一管理目录中", name));
+        }
+    } else {
+        copy_dir_recursive(&target_canon, &manager_target)?;
+    }
+
+    remove_path(&target_canon)?;
+
+    let mut linked_done = false;
+    if create_symlink_dir(&manager_target, &target).is_ok() {
+        linked_done = true;
+    }
+
+    #[cfg(target_family = "windows")]
+    if !linked_done {
+        if create_junction_dir(&manager_target, &target).is_ok() {
+            linked_done = true;
+        }
+    }
+
+    if !linked_done {
+        copy_dir_recursive(&manager_target, &target)?;
+    }
+
+    Ok(format!(
+        "已将 {} 纳入统一管理，并重新关联到 {}",
+        name, request.ide_label
+    ))
 }
 
 #[tauri::command]

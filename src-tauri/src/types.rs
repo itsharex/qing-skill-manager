@@ -120,6 +120,7 @@ pub struct IdeSkill {
     pub path: String,
     pub ide: String,
     pub source: String,
+    pub managed: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -154,4 +155,11 @@ pub struct ImportRequest {
 #[serde(rename_all = "camelCase")]
 pub struct DeleteLocalSkillRequest {
     pub target_paths: Vec<String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AdoptIdeSkillRequest {
+    pub target_path: String,
+    pub ide_label: String,
 }

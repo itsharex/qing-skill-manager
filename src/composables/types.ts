@@ -55,6 +55,7 @@ export type IdeSkill = {
   path: string;
   ide: string;
   source: string;
+  managed: boolean;
 };
 
 /**

@@ -6,13 +6,15 @@ use commands::market::{
     download_marketplace_skill, search_marketplaces, update_marketplace_skill,
 };
 use commands::skills::{
-    delete_local_skills, import_local_skill, link_local_skill, scan_overview, uninstall_skill,
+    adopt_ide_skill, delete_local_skills, import_local_skill, link_local_skill, scan_overview,
+    uninstall_skill,
 };
 
 pub use crate::types::{
-    DeleteLocalSkillRequest, DownloadRequest, DownloadResult, IdeDir, IdeSkill, ImportRequest,
-    InstallResult, LinkRequest, LinkTarget, LocalScanRequest, LocalSkill, MarketStatus, Overview,
-    RemoteSkill, RemoteSkillView, RemoteSkillsResponse, RemoteSkillsViewResponse, UninstallRequest,
+    AdoptIdeSkillRequest, DeleteLocalSkillRequest, DownloadRequest, DownloadResult, IdeDir,
+    IdeSkill, ImportRequest, InstallResult, LinkRequest, LinkTarget, LocalScanRequest, LocalSkill,
+    MarketStatus, Overview, RemoteSkill, RemoteSkillView, RemoteSkillsResponse,
+    RemoteSkillsViewResponse, UninstallRequest,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -30,7 +32,8 @@ pub fn run() {
             scan_overview,
             uninstall_skill,
             import_local_skill,
-            delete_local_skills
+            delete_local_skills,
+            adopt_ide_skill
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
