@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.13](https://github.com/Rito-w/skills-manager/compare/v0.3.12...v0.3.13) (2026-03-09)
+
+### Bug Fixes
+
+* allow custom IDE install targets under user home without hardcoded base-dir allowlist
+* show backend tauri string errors in UI instead of generic install failed
+
 ### [0.3.11](https://github.com/Rito-w/skills-manager/compare/v0.3.10...v0.3.11) (2026-03-06)
 
 

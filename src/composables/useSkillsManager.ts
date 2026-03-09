@@ -21,6 +21,16 @@ function isSafeRelativePath(input: string): boolean {
   return parts.every((part) => part !== ".." && part !== "");
 }
 
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === "string" && err.trim()) return err;
+  if (err && typeof err === "object") {
+    const maybeMessage = (err as { message?: unknown }).message;
+    if (typeof maybeMessage === "string" && maybeMessage.trim()) return maybeMessage;
+  }
+  return fallback;
+}
+
 export function useSkillsManager() {
   const { t } = useI18n();
   const toast = useToast();
@@ -185,7 +195,7 @@ export function useSkillsManager() {
         });
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("errors.searchFailed"));
+      toast.error(getErrorMessage(err, t("errors.searchFailed")));
     } finally {
       loading.value = false;
     }
@@ -311,7 +321,7 @@ export function useSkillsManager() {
       localSkills.value = response.managerSkills;
       ideSkills.value = response.ideSkills;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("errors.scanFailed"));
+      toast.error(getErrorMessage(err, t("errors.scanFailed")));
     } finally {
       localLoading.value = false;
     }
@@ -380,7 +390,7 @@ export function useSkillsManager() {
       showInstallModal.value = false;
       installTargetSkills.value = [];
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("errors.installFailed"));
+      toast.error(getErrorMessage(err, t("errors.installFailed")));
     } finally {
       installingId.value = null;
       busy.value = false;
@@ -434,11 +444,10 @@ export function useSkillsManager() {
       await scanLocalSkills();
     } catch (err) {
       toast.error(
-        err instanceof Error
-          ? err.message
-          : uninstallMode.value === "local"
-            ? t("errors.deleteFailed")
-            : t("errors.uninstallFailed")
+        getErrorMessage(
+          err,
+          uninstallMode.value === "local" ? t("errors.deleteFailed") : t("errors.uninstallFailed")
+        )
       );
     } finally {
       showUninstallModal.value = false;
@@ -503,7 +512,7 @@ export function useSkillsManager() {
 
       await scanLocalSkills();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("errors.importFailed"));
+      toast.error(getErrorMessage(err, t("errors.importFailed")));
     } finally {
       busy.value = false;
       busyText.value = "";
@@ -514,7 +523,7 @@ export function useSkillsManager() {
     try {
       await revealItemInDir(path);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("errors.openDirFailed"));
+      toast.error(getErrorMessage(err, t("errors.openDirFailed")));
     }
   }
 
@@ -531,7 +540,7 @@ export function useSkillsManager() {
       toast.success(message);
       await scanLocalSkills();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("errors.adoptFailed"));
+      toast.error(getErrorMessage(err, t("errors.adoptFailed")));
     } finally {
       busy.value = false;
       busyText.value = "";
