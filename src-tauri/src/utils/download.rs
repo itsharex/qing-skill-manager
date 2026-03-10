@@ -55,10 +55,8 @@ pub fn download_skill_to_dir(
         }
     }
 
-    let zip_url = if source_url.starts_with("https://github.com/") {
-        let parts: Vec<&str> = source_url["https://github.com/".len()..]
-            .split('/')
-            .collect();
+    let zip_url = if let Some(stripped) = source_url.strip_prefix("https://github.com/") {
+        let parts: Vec<&str> = stripped.split('/').collect();
         if parts.len() >= 2 {
             let owner = parts[0];
             let repo = parts[1].strip_suffix(".git").unwrap_or(parts[1]);

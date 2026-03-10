@@ -1,5 +1,5 @@
 use crate::types::{
-    DownloadRequest, DownloadResult, MarketStatus, RemoteSkill, RemoteSkillView,
+    DownloadRequest, DownloadResult, MarketStatus, MarketStatusType, RemoteSkill, RemoteSkillView,
     RemoteSkillsResponse, RemoteSkillsViewResponse,
 };
 use crate::utils::download::{download_bytes, download_skill_to_dir};
@@ -170,101 +170,6 @@ fn parse_skillsmp(
     Ok((skills, total))
 }
 
-#[allow(dead_code)]
-fn parse_agent_skills_index(
-    buf: &[u8],
-    market_id: &str,
-    market_label: &str,
-) -> Result<(Vec<RemoteSkillView>, u64), String> {
-    let value: serde_json::Value = serde_json::from_slice(buf).map_err(|err| err.to_string())?;
-
-    let list = value
-        .get("skills")
-        .and_then(|v| v.as_array())
-        .or_else(|| value.get("data").and_then(|v| v.as_array()))
-        .or_else(|| value.get("items").and_then(|v| v.as_array()))
-        .or_else(|| {
-            value
-                .get("data")
-                .and_then(|v| v.get("skills"))
-                .and_then(|v| v.as_array())
-        })
-        .or_else(|| {
-            value
-                .get("data")
-                .and_then(|v| v.get("items"))
-                .and_then(|v| v.as_array())
-        });
-
-    let mut skills = Vec::new();
-    if let Some(items) = list {
-        for item in items {
-            let owner = get_value_string(item, &["github_owner", "githubOwner", "owner"]);
-            let repo = get_value_string(item, &["github_repo", "githubRepo", "repo"]);
-            let source_url = get_value_string(
-                item,
-                &[
-                    "sourceUrl",
-                    "source_url",
-                    "githubUrl",
-                    "github_url",
-                    "html_url",
-                ],
-            )
-            .or_else(|| match (owner.as_deref(), repo.as_deref()) {
-                (Some(o), Some(r)) => Some(build_github_source_url(o, r)),
-                _ => None,
-            })
-            .unwrap_or_default();
-
-            let name = get_value_string(item, &["name", "title"])
-                .or_else(|| repo.clone())
-                .unwrap_or_else(|| "skill".to_string());
-            let description =
-                get_value_string(item, &["description", "summary"]).unwrap_or_default();
-            let author =
-                get_value_string(item, &["author", "owner", "github_owner", "githubOwner"])
-                    .unwrap_or_default();
-            let namespace = get_value_string(item, &["namespace"])
-                .or_else(|| owner.clone())
-                .unwrap_or_default();
-            let installs =
-                get_value_u64(item, &["installs", "downloads", "download_count"]).unwrap_or(0);
-            let stars =
-                get_value_u64(item, &["stars", "stargazers_count", "github_stars"]).unwrap_or(0);
-            let raw_id = get_value_string(item, &["id", "slug"])
-                .or_else(|| match (owner.as_deref(), repo.as_deref()) {
-                    (Some(o), Some(r)) => Some(format!("{}/{}", o, r)),
-                    _ => None,
-                })
-                .unwrap_or_else(|| name.clone());
-
-            skills.push(RemoteSkillView {
-                id: format!("{}:{}", market_id, raw_id),
-                name,
-                namespace,
-                source_url,
-                description,
-                author,
-                installs,
-                stars,
-                market_id: market_id.to_string(),
-                market_label: market_label.to_string(),
-            });
-        }
-    }
-
-    let total = get_value_u64(&value, &["total", "count", "totalCount"])
-        .or_else(|| {
-            value
-                .get("meta")
-                .and_then(|meta| get_value_u64(meta, &["total", "count", "totalCount"]))
-        })
-        .unwrap_or(skills.len() as u64);
-
-    Ok((skills, total))
-}
-
 #[tauri::command]
 pub async fn search_marketplaces(
     query: String,
@@ -314,14 +219,14 @@ pub async fn search_marketplaces(
                         market_statuses.push(MarketStatus {
                             id: claude_market_id.to_string(),
                             name: claude_market_label.to_string(),
-                            status: "online".to_string(),
+                            status: MarketStatusType::Online,
                             error: None,
                         });
                     } else {
                         market_statuses.push(MarketStatus {
                             id: claude_market_id.to_string(),
                             name: claude_market_label.to_string(),
-                            status: "error".to_string(),
+                            status: MarketStatusType::Error,
                             error: Some("Failed to parse response".to_string()),
                         });
                     }
@@ -331,7 +236,7 @@ pub async fn search_marketplaces(
                     market_statuses.push(MarketStatus {
                         id: claude_market_id.to_string(),
                         name: claude_market_label.to_string(),
-                        status: "error".to_string(),
+                        status: MarketStatusType::Error,
                         error: Some(e),
                     });
                 }
@@ -340,7 +245,7 @@ pub async fn search_marketplaces(
             market_statuses.push(MarketStatus {
                 id: claude_market_id.to_string(),
                 name: claude_market_label.to_string(),
-                status: "online".to_string(),
+                status: MarketStatusType::Online,
                 error: None,
             });
         }
@@ -372,14 +277,14 @@ pub async fn search_marketplaces(
                         market_statuses.push(MarketStatus {
                             id: skillsllm_market_id.to_string(),
                             name: skillsllm_market_label.to_string(),
-                            status: "online".to_string(),
+                            status: MarketStatusType::Online,
                             error: None,
                         });
                     } else {
                         market_statuses.push(MarketStatus {
                             id: skillsllm_market_id.to_string(),
                             name: skillsllm_market_label.to_string(),
-                            status: "error".to_string(),
+                            status: MarketStatusType::Error,
                             error: Some("Failed to parse response".to_string()),
                         });
                     }
@@ -389,7 +294,7 @@ pub async fn search_marketplaces(
                     market_statuses.push(MarketStatus {
                         id: skillsllm_market_id.to_string(),
                         name: skillsllm_market_label.to_string(),
-                        status: "error".to_string(),
+                        status: MarketStatusType::Error,
                         error: Some(e),
                     });
                 }
@@ -398,7 +303,7 @@ pub async fn search_marketplaces(
             market_statuses.push(MarketStatus {
                 id: skillsllm_market_id.to_string(),
                 name: skillsllm_market_label.to_string(),
-                status: "online".to_string(),
+                status: MarketStatusType::Online,
                 error: None,
             });
         }
@@ -435,14 +340,14 @@ pub async fn search_marketplaces(
                             market_statuses.push(MarketStatus {
                                 id: skillsmp_market_id.to_string(),
                                 name: skillsmp_market_label.to_string(),
-                                status: "online".to_string(),
+                                status: MarketStatusType::Online,
                                 error: None,
                             });
                         } else {
                             market_statuses.push(MarketStatus {
                                 id: skillsmp_market_id.to_string(),
                                 name: skillsmp_market_label.to_string(),
-                                status: "error".to_string(),
+                                status: MarketStatusType::Error,
                                 error: Some("Failed to parse response".to_string()),
                             });
                         }
@@ -452,7 +357,7 @@ pub async fn search_marketplaces(
                         market_statuses.push(MarketStatus {
                             id: skillsmp_market_id.to_string(),
                             name: skillsmp_market_label.to_string(),
-                            status: "error".to_string(),
+                            status: MarketStatusType::Error,
                             error: Some(e),
                         });
                     }
@@ -461,7 +366,7 @@ pub async fn search_marketplaces(
                 market_statuses.push(MarketStatus {
                     id: skillsmp_market_id.to_string(),
                     name: skillsmp_market_label.to_string(),
-                    status: "needs_key".to_string(),
+                    status: MarketStatusType::NeedsKey,
                     error: None,
                 });
             }
@@ -469,7 +374,7 @@ pub async fn search_marketplaces(
             market_statuses.push(MarketStatus {
                 id: skillsmp_market_id.to_string(),
                 name: skillsmp_market_label.to_string(),
-                status: "needs_key".to_string(),
+                status: MarketStatusType::NeedsKey,
                 error: None,
             });
         }

@@ -11,7 +11,7 @@ use commands::skills::{
 pub use crate::types::{
     AdoptIdeSkillRequest, DeleteLocalSkillRequest, DownloadRequest, DownloadResult, IdeDir,
     IdeSkill, ImportRequest, InstallResult, LinkRequest, LinkTarget, LocalScanRequest, LocalSkill,
-    MarketStatus, Overview, RemoteSkill, RemoteSkillView, RemoteSkillsResponse,
+    MarketStatus, MarketStatusType, Overview, RemoteSkill, RemoteSkillView, RemoteSkillsResponse,
     RemoteSkillsViewResponse, UninstallRequest,
 };
 
