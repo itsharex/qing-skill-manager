@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.20](https://github.com/Rito-w/skills-manager/compare/v0.3.19...v0.3.20) (2026-03-18)
+
+
+### Features
+
+* add project management feature ([1a022da](https://github.com/Rito-w/skills-manager/commit/1a022daa31bc5f2b72deb128470f95c31aac68ec))
+
 ### [0.3.19](https://github.com/Rito-w/skills-manager/compare/v0.3.18...v0.3.19) (2026-03-16)
 
 
