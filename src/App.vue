@@ -6,6 +6,8 @@ import { useSkillsManager } from "./composables/useSkillsManager";
 import { useUpdateStore } from "./composables/useUpdateStore";
 import { useProjectConfig } from "./composables/useProjectConfig";
 import { useToast } from "./composables/useToast";
+import { getErrorMessage } from "./composables/utils";
+import { invoke } from "@tauri-apps/api/core";
 import MarketPanel from "./components/MarketPanel.vue";
 import LocalPanel from "./components/LocalPanel.vue";
 import IdePanel from "./components/IdePanel.vue";
@@ -17,11 +19,17 @@ import LoadingOverlay from "./components/LoadingOverlay.vue";
 import Toast from "./components/Toast.vue";
 import ProjectAddModal from "./components/ProjectAddModal.vue";
 import ProjectConfigModal from "./components/ProjectConfigModal.vue";
+import ConflictResolutionModal from "./components/ConflictResolutionModal.vue";
+import ProjectSkillImportModal from "./components/ProjectSkillImportModal.vue";
+import ImportToProjectModal from "./components/ImportToProjectModal.vue";
+import VersionManagerModal from "./components/VersionManagerModal.vue";
+import VersionDiffModal from "./components/VersionDiffModal.vue";
+import type { ProjectSkill, LocalSkill, SkillDiff, SkillVersion } from "./composables/types";
 
 const { t } = useI18n();
 
 // Mark components as used for template
-void [ProjectsPanel, ProjectAddModal, ProjectConfigModal];
+void [ProjectsPanel, ProjectAddModal, ProjectConfigModal, ProjectSkillImportModal, ConflictResolutionModal, VersionManagerModal, VersionDiffModal];
 
 const localeKey = "skillsManager.locale";
 const themeKey = "skillsManager.theme";
@@ -117,7 +125,33 @@ const {
   downloadQueue,
   recentTaskStatus,
   retryDownload,
-  removeFromQueue
+  removeFromQueue,
+  projectSkillScanResult,
+  showConflictModal,
+  currentConflictSkill,
+  scanProjectSkills,
+  resolveConflict,
+  openConflictModal,
+  closeConflictModal,
+  currentSkillPackage,
+  showVersionManagerModal,
+  versionLoading,
+  currentConflictAnalysis,
+  showVersionDiffModal,
+  currentVersionDiff,
+  analyzeConflict,
+  compareVersions,
+  createVersion,
+  renameVersion,
+  deleteVersion,
+  setDefaultVersion,
+  createVariant,
+  updateVariant,
+  deleteVariant,
+  openVersionManagerModal,
+  closeVersionManagerModal,
+  openVersionDiffModal,
+  closeVersionDiffModal
 } = useSkillsManager();
 
 // Update store for startup check and badge
@@ -141,6 +175,8 @@ const {
 const showProjectAddModal = ref(false);
 const showProjectConfigModal = ref(false);
 const configuringProject = ref<typeof selectedProject.value>(null);
+const showProjectExportModal = ref(false);
+const showProjectImportModal = ref(false);
 
 async function handleAddProject() {
   showProjectAddModal.value = true;
@@ -182,19 +218,275 @@ async function handleProjectConfigSave(projectId: string, ideTargets: string[]) 
   configuringProject.value = null;
 }
 
-async function handleLinkSkills(projectId: string) {
+async function handleExportSkills(projectId: string) {
   const project = projects.value.find((p) => p.id === projectId);
-  if (!project || project.ideTargets.length === 0) {
-    toast.error(t("errors.projectNoIdeTargets"));
+  if (!project) {
+    toast.error(t("errors.projectNotFound"));
     return;
   }
 
-  // Store project context for installation
-  selectedProjectId.value = projectId;
-  
-  // Switch to local tab and let user select skills
-  activeTab.value = "local";
-  toast.info(t("messages.selectSkillsForProject", { name: project.name }));
+  // Scan project for OpenCode skills
+  const result = await scanProjectSkills(project.path);
+  if (!result) return;
+
+  if (result.skills.length === 0) {
+    toast.info(t("projects.noSkillsFound"));
+    return;
+  }
+
+  // Show export modal with scan results
+  showProjectExportModal.value = true;
+}
+
+function handleImportSkills(projectId: string) {
+  const project = projects.value.find((p) => p.id === projectId);
+  if (!project) {
+    toast.error(t("errors.projectNotFound"));
+    return;
+  }
+
+  configuringProject.value = project;
+  showProjectImportModal.value = true;
+}
+
+async function handleConflictResolution(resolution: "keep" | "overwrite" | "coexist", coexistName?: string) {
+  if (!currentConflictSkill.value) return;
+
+  await resolveConflict(currentConflictSkill.value, resolution, coexistName);
+  closeConflictModal();
+
+  // Refresh local skills after resolution
+  await scanLocalSkills();
+
+  // Re-scan project skills to update the import modal
+  if (selectedProjectId.value) {
+    const project = projects.value.find((p) => p.id === selectedProjectId.value);
+    if (project) {
+      await scanProjectSkills(project.path);
+    }
+  }
+}
+
+async function handleImportSelected(skillPaths: string[]) {
+  if (skillPaths.length === 0) return;
+
+  busy.value = true;
+  busyText.value = t("messages.importing");
+
+  try {
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const path of skillPaths) {
+      try {
+        await invoke("import_local_skill", {
+          request: {
+            sourcePath: path
+          }
+        });
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(t("messages.imported", { success: successCount, failed: failCount }));
+    } else {
+      toast.error(t("errors.importFailed"));
+    }
+
+    showProjectImportModal.value = false;
+    await scanLocalSkills();
+  } catch (err) {
+    toast.error(getErrorMessage(err, t("errors.importFailed")));
+  } finally {
+    busy.value = false;
+    busyText.value = "";
+  }
+}
+
+async function handleResolveConflictFromImport(skill: ProjectSkill) {
+  if (skill.existingRegistrySkill?.currentVersion && skill.currentVersion) {
+    await analyzeConflict({
+      skillId: skill.existingRegistrySkill.currentVersion.skillId,
+      baseVersionId: skill.existingRegistrySkill.currentVersion.id,
+      incomingPath: skill.path
+    });
+  }
+  openConflictModal(skill);
+}
+
+// Version management handlers
+function handleManageVersions(skill: LocalSkill) {
+  currentManagedSkillPath.value = skill.path;
+  selectedCreateVersionSourcePath.value = "";
+  openVersionManagerModal(skill.currentVersion?.skillId || skill.id);
+}
+
+const comparingFromVersion = ref<SkillVersion | null>(null);
+const comparingToVersion = ref<SkillVersion | null>(null);
+const currentDiff = ref<SkillDiff | null>(null);
+const currentManagedSkillPath = ref("");
+const selectedCreateVersionSourcePath = ref("");
+
+async function handleCompareVersions(fromVersionId: string, toVersionId: string) {
+  if (!currentSkillPackage.value) return;
+
+  const fromVersion = currentSkillPackage.value.versions.find(v => v.id === fromVersionId) || null;
+  const toVersion = currentSkillPackage.value.versions.find(v => v.id === toVersionId) || null;
+
+  comparingFromVersion.value = fromVersion;
+  comparingToVersion.value = toVersion;
+
+  currentDiff.value = await compareVersions(currentSkillPackage.value.id, fromVersionId, toVersionId);
+  openVersionDiffModal();
+}
+
+async function handleCreateVersion(version: string, displayName: string, sourcePath: string, parentVersion?: string) {
+  if (!currentSkillPackage.value) return;
+  await createVersion({
+    skillId: currentSkillPackage.value.id,
+    version,
+    displayName,
+    sourcePath,
+    source: "import",
+    parentVersion,
+    sourceUrl: undefined
+  });
+}
+
+async function handlePickSourcePath() {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const selected = await open({
+    directory: true,
+    multiple: false,
+    title: t("version.pickSourcePathTitle")
+  });
+
+  if (!selected || Array.isArray(selected)) {
+    return;
+  }
+
+  selectedCreateVersionSourcePath.value = selected;
+}
+
+async function handleRenameVersion(versionId: string, newName: string) {
+  if (!currentSkillPackage.value) return;
+  await renameVersion(currentSkillPackage.value.id, versionId, newName);
+}
+
+async function handleDeleteVersion(versionId: string, strategy: "soft" | "archive" | "hard", force: boolean) {
+  if (!currentSkillPackage.value) return;
+  await deleteVersion(currentSkillPackage.value.id, versionId, strategy, force);
+}
+
+async function handleSetDefaultVersion(versionId: string) {
+  if (!currentSkillPackage.value) return;
+  await setDefaultVersion(currentSkillPackage.value.id, versionId);
+}
+
+async function handleCreateVariant(versionId: string, name: string, description?: string) {
+  if (!currentSkillPackage.value) return;
+  await createVariant({
+    skillId: currentSkillPackage.value.id,
+    versionId,
+    name,
+    description
+  });
+}
+
+async function handleDeleteVariant(variantId: string) {
+  if (!currentSkillPackage.value) return;
+  await deleteVariant({
+    skillId: currentSkillPackage.value.id,
+    variantId
+  });
+}
+
+async function handleUpdateVariant(
+  variantId: string,
+  newName?: string,
+  newVersionId?: string,
+  newDescription?: string
+) {
+  if (!currentSkillPackage.value) return;
+  await updateVariant({
+    skillId: currentSkillPackage.value.id,
+    variantId,
+    newName,
+    newVersionId,
+    newDescription
+  });
+}
+
+async function handleLinkSkillsToProject(skillIds: string[], ideLabels: string[]) {
+  if (!configuringProject.value) return;
+
+  busy.value = true;
+  busyText.value = t("messages.linkingSkills");
+
+  try {
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const skillId of skillIds) {
+      const skill = localSkills.value.find(s => s.id === skillId);
+      if (!skill) continue;
+
+      try {
+        // Build link targets for the project's IDE directories
+        const linkTargets = [];
+        for (const ideLabel of ideLabels) {
+          const target = ideOptions.value.find(opt => opt.label === ideLabel);
+          if (!target) continue;
+
+          const projectPath = configuringProject.value.path;
+          // Use projectDir if available (for OpenCode it's .opencode/skills)
+          // Otherwise fall back to globalDir behavior
+          const ideDir = target.projectDir 
+            ? `${projectPath}/${target.projectDir}`
+            : target.globalDir.startsWith('.') 
+              ? `${projectPath}/${target.globalDir}`
+              : target.globalDir;
+          
+          linkTargets.push({
+            name: ideLabel,
+            path: ideDir
+          });
+        }
+
+        if (linkTargets.length === 0) {
+          failCount++;
+          continue;
+        }
+
+        await invoke("link_local_skill", {
+          request: {
+            skillPath: skill.path,
+            skillName: skill.name,
+            linkTargets
+          }
+        });
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(t("messages.skillsLinked", { success: successCount, failed: failCount }));
+      showProjectImportModal.value = false;
+      await scanLocalSkills();
+    } else {
+      toast.error(t("errors.linkFailed"));
+    }
+  } catch (err) {
+    toast.error(getErrorMessage(err, t("errors.linkFailed")));
+  } finally {
+    busy.value = false;
+    busyText.value = "";
+  }
 }
 </script>
 
@@ -289,6 +581,7 @@ async function handleLinkSkills(projectId: string) {
           @import="importLocalSkill"
           @retry-download="retryDownload"
           @remove-from-queue="removeFromQueue"
+          @manage-versions="handleManageVersions"
         />
       </template>
 
@@ -348,7 +641,8 @@ async function handleLinkSkills(projectId: string) {
           @remove-project="handleRemoveProject"
           @select-project="handleSelectProject"
           @configure-project="handleConfigureProject"
-          @link-skills="handleLinkSkills"
+          @export-skills="handleExportSkills"
+          @import-skills="handleImportSkills"
         />
       </template>
 
@@ -385,6 +679,56 @@ async function handleLinkSkills(projectId: string) {
       :ide-options="ideOptions"
       @close="() => { showProjectConfigModal = false; configuringProject = null; }"
       @save="handleProjectConfigSave"
+    />
+
+    <ConflictResolutionModal
+      :show="showConflictModal"
+      :skill="currentConflictSkill"
+      :conflict-analysis="currentConflictAnalysis"
+      @close="closeConflictModal"
+      @resolve="handleConflictResolution"
+    />
+
+    <ProjectSkillImportModal
+      :show="showProjectExportModal"
+      :scan-result="projectSkillScanResult"
+      @close="showProjectExportModal = false"
+      @import="handleImportSelected"
+      @resolve-conflict="handleResolveConflictFromImport"
+    />
+
+    <ImportToProjectModal
+      :show="showProjectImportModal"
+      :project="configuringProject"
+      :local-skills="localSkills"
+      @close="showProjectImportModal = false"
+      @link="handleLinkSkillsToProject"
+    />
+
+    <VersionManagerModal
+      :show="showVersionManagerModal"
+      :skill-package="currentSkillPackage"
+      :current-skill-path="currentManagedSkillPath"
+      :selected-source-path="selectedCreateVersionSourcePath"
+      :loading="versionLoading"
+      @close="closeVersionManagerModal"
+      @rename="handleRenameVersion"
+      @delete="handleDeleteVersion"
+      @set-default="handleSetDefaultVersion"
+      @compare="handleCompareVersions"
+      @create-version="handleCreateVersion"
+      @pick-source-path="handlePickSourcePath"
+      @create-variant="handleCreateVariant"
+      @update-variant="handleUpdateVariant"
+      @delete-variant="handleDeleteVariant"
+    />
+
+    <VersionDiffModal
+      :show="showVersionDiffModal"
+      :diff="currentVersionDiff || currentDiff"
+      :from-version="comparingFromVersion"
+      :to-version="comparingToVersion"
+      @close="closeVersionDiffModal"
     />
 
     <Toast />

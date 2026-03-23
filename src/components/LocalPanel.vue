@@ -23,6 +23,7 @@ const emit = defineEmits<{
   (e: "import"): void;
   (e: "retryDownload", taskId: string): void;
   (e: "removeFromQueue", taskId: string): void;
+  (e: "manageVersions", skill: LocalSkill): void;
 }>();
 
 const selectedIds = ref<string[]>([]);
@@ -177,6 +178,9 @@ function deleteSelected() {
             <button class="primary" :disabled="installingId === skill.id" @click="$emit('install', skill)">
             {{ installingId === skill.id ? t("local.processing") : t("local.install") }}
             </button>
+            <button class="ghost" @click="$emit('manageVersions', skill)">
+              {{ t("local.manageVersions") }}
+            </button>
             <button class="ghost" @click="$emit('openDir', skill.path)">
               {{ t("local.openDir") }}
             </button>
@@ -186,6 +190,12 @@ function deleteSelected() {
           </div>
         </div>
         <p class="card-desc">{{ skill.description }}</p>
+        <div v-if="skill.currentVersion" class="version-summary">
+          <span class="version-chip">{{ skill.currentVersion.displayName }}</span>
+          <span class="version-meta-text">
+            {{ t("version.totalVersions") }}: {{ skill.versionCount }}
+          </span>
+        </div>
         <div class="card-link">{{ skill.path }}</div>
         <div class="ide-badges">
           <span
@@ -263,6 +273,28 @@ function deleteSelected() {
 
 .card-select {
   padding-top: 2px;
+}
+
+.version-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.version-chip {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--color-chip-bg);
+  border: 1px solid var(--color-chip-border);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.version-meta-text {
+  color: var(--color-muted);
+  font-size: 12px;
 }
 
 .ide-badges {

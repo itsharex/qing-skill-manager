@@ -18,7 +18,8 @@ const emit = defineEmits<{
   (e: "removeProject", projectId: string): void;
   (e: "selectProject", projectId: string | null): void;
   (e: "configureProject", projectId: string): void;
-  (e: "linkSkills", projectId: string): void;
+  (e: "exportSkills", projectId: string): void;
+  (e: "importSkills", projectId: string): void;
 }>();
 
 function handleAddProject() {
@@ -37,8 +38,12 @@ function handleConfigureProject(projectId: string) {
   emit("configureProject", projectId);
 }
 
-function handleLinkSkills(projectId: string) {
-  emit("linkSkills", projectId);
+function handleExportSkills(projectId: string) {
+  emit("exportSkills", projectId);
+}
+
+function handleImportSkills(projectId: string) {
+  emit("importSkills", projectId);
 }
 
 async function handleOpenDirectory(project: ProjectConfig) {
@@ -102,10 +107,16 @@ function buildIdeBadgeList(project: ProjectConfig) {
             </button>
             <button
               class="primary small"
-              :disabled="localLoading || project.ideTargets.length === 0"
-              @click="handleLinkSkills(project.id)"
+              @click="handleExportSkills(project.id)"
             >
-              {{ t("projects.linkSkills") }}
+              {{ t("projects.exportSkills") }}
+            </button>
+            <button
+              class="primary small"
+              :disabled="localLoading"
+              @click="handleImportSkills(project.id)"
+            >
+              {{ t("projects.importSkills") }}
             </button>
             <button
               class="ghost danger small"
