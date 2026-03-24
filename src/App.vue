@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { i18n, supportedLocales, type SupportedLocale } from "./i18n";
 import { buildProjectCloneTargetPath } from "./composables/constants";
 import { useSkillsManager } from "./composables/useSkillsManager";
 import { useProjectConfig } from "./composables/useProjectConfig";
 import { useToast } from "./composables/useToast";
+import { usePreferences } from "./composables/usePreferences";
+import { useProjectSnapshots } from "./composables/useProjectSnapshots";
+import { useVersionManagementState } from "./composables/useVersionManagementState";
+import { useProjectModals } from "./composables/useProjectModals";
 import { getErrorMessage } from "./composables/utils";
 import { invoke } from "@tauri-apps/api/core";
 import MarketPanel from "./components/MarketPanel.vue";
@@ -24,57 +27,12 @@ import ProjectSkillImportModal from "./components/ProjectSkillImportModal.vue";
 import ImportToProjectModal from "./components/ImportToProjectModal.vue";
 import VersionManagerModal from "./components/VersionManagerModal.vue";
 import VersionDiffModal from "./components/VersionDiffModal.vue";
-import type { ProjectSkill, LocalSkill, SkillDiff, SkillVersion } from "./composables/types";
+import type { ProjectSkill, LocalSkill } from "./composables/types";
 
 const { t } = useI18n();
-
-// Mark components as used for template
 void [ProjectsPanel, ProjectAddModal, ProjectConfigModal, ProjectSkillImportModal, ConflictResolutionModal, VersionManagerModal, VersionDiffModal];
 
-const localeKey = "qingSkillManager.locale";
-const themeKey = "qingSkillManager.theme";
-
-const theme = ref<"light" | "dark">("light");
-const locale = ref<SupportedLocale>("zh-CN");
-
-const applyTheme = (next: "light" | "dark") => {
-  document.documentElement.setAttribute("data-theme", next);
-};
-
-const loadLocale = (): SupportedLocale => {
-  const stored = localStorage.getItem(localeKey) as SupportedLocale | null;
-  if (stored && supportedLocales.includes(stored)) return stored;
-  const browser = navigator.language.startsWith("zh") ? "zh-CN" : "en-US";
-  return browser as SupportedLocale;
-};
-
-const loadTheme = (): "light" | "dark" => {
-  const stored = localStorage.getItem(themeKey);
-  if (stored === "dark" || stored === "light") return stored;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-};
-
-onMounted(() => {
-  locale.value = loadLocale();
-  theme.value = loadTheme();
-  i18n.global.locale.value = locale.value;
-  applyTheme(theme.value);
-
-  // Load projects
-  loadProjects();
-  void refreshProjectSkillSnapshots();
-  restartProjectSnapshotRefreshLoop();
-});
-
-watch(locale, (next) => {
-  i18n.global.locale.value = next;
-  localStorage.setItem(localeKey, next);
-});
-
-watch(theme, (next) => {
-  applyTheme(next);
-  localStorage.setItem(themeKey, next);
-});
+const { theme, locale, toggleTheme, toggleLocale } = usePreferences();
 
 const {
   activeTab,
@@ -153,20 +111,63 @@ const {
   closeVersionDiffModal
 } = useSkillsManager();
 
-// Toast
 const toast = useToast();
 
-// Project management
 const {
   projects,
   selectedProjectId,
-  selectedProject,
   loadProjects,
   addProject,
   removeProject,
   updateProjectIdeTargets,
   updateDetectedIdeDirs
 } = useProjectConfig();
+
+const {
+  projectSkillSnapshots,
+  refreshProjectSkillSnapshots,
+  restartProjectSnapshotRefreshLoop
+} = useProjectSnapshots({ projects, scanProjectSkills });
+
+const {
+  comparingFromVersion,
+  comparingToVersion,
+  currentDiff,
+  currentManagedSkillPath,
+  selectedCreateVersionSourcePath,
+  versionImportProjectId,
+  versionImportProjectSkills,
+  versionImportProjectSkillsLoading,
+  setComparisonVersions,
+  setVersionImportProject
+} = useVersionManagementState();
+
+const {
+  showProjectAddModal,
+  showProjectConfigModal,
+  showProjectExportModal,
+  showProjectImportModal,
+  configuringProject,
+  openProjectAddModal,
+  closeProjectAddModal,
+  openProjectConfigModal,
+  closeProjectConfigModal,
+  openProjectExportModal,
+  closeProjectExportModal,
+  openProjectImportModal,
+  closeProjectImportModal
+} = useProjectModals();
+
+const localBusy = ref(false);
+const localBusyText = ref("");
+const displayBusy = computed(() => localBusy.value || busy.value);
+const displayBusyText = computed(() => localBusyText.value || busyText.value);
+
+onMounted(() => {
+  loadProjects();
+  void refreshProjectSkillSnapshots();
+  restartProjectSnapshotRefreshLoop();
+});
 
 watch(projects, () => {
   void refreshProjectSkillSnapshots();
@@ -179,16 +180,6 @@ watch(activeTab, (tab) => {
   }
 });
 
-const showProjectAddModal = ref(false);
-const showProjectConfigModal = ref(false);
-const configuringProject = ref<typeof selectedProject.value>(null);
-const showProjectExportModal = ref(false);
-const showProjectImportModal = ref(false);
-
-async function handleAddProject() {
-  showProjectAddModal.value = true;
-}
-
 async function handleRemoveProject(projectId: string) {
   removeProject(projectId);
 }
@@ -197,14 +188,8 @@ async function handleSelectProject(projectId: string | null) {
   selectedProjectId.value = projectId;
 }
 
-async function handleConfigureProject(projectId: string) {
-  configuringProject.value = projects.value.find((p) => p.id === projectId) || null;
-  showProjectConfigModal.value = true;
-}
-
 async function handleProjectAddConfirm(path: string, name: string) {
   try {
-    const { invoke } = await import("@tauri-apps/api/core");
     const scanResult = await invoke("scan_project_ide_dirs", {
       request: { projectDir: path }
     }) as { detectedIdeDirs: Array<{ label: string; relativeDir: string; absolutePath: string }> };
@@ -213,7 +198,7 @@ async function handleProjectAddConfirm(path: string, name: string) {
     if (project) {
       updateDetectedIdeDirs(project.id, scanResult.detectedIdeDirs);
     }
-    showProjectAddModal.value = false;
+    closeProjectAddModal();
   } catch (err) {
     console.error("Failed to scan project:", err);
   }
@@ -221,18 +206,16 @@ async function handleProjectAddConfirm(path: string, name: string) {
 
 async function handleProjectConfigSave(projectId: string, ideTargets: string[]) {
   updateProjectIdeTargets(projectId, ideTargets);
-  showProjectConfigModal.value = false;
-  configuringProject.value = null;
+  closeProjectConfigModal();
 }
 
 async function handleExportSkills(projectId: string) {
-  const project = projects.value.find((p) => p.id === projectId);
+  const project = projects.value.find((item) => item.id === projectId);
   if (!project) {
     toast.error(t("errors.projectNotFound"));
     return;
   }
 
-  // Scan project for OpenCode skills
   const result = await scanProjectSkills(project.path);
   if (!result) return;
 
@@ -241,19 +224,17 @@ async function handleExportSkills(projectId: string) {
     return;
   }
 
-  // Show export modal with scan results
-  showProjectExportModal.value = true;
+  openProjectExportModal();
 }
 
 function handleImportSkills(projectId: string) {
-  const project = projects.value.find((p) => p.id === projectId);
+  const project = projects.value.find((item) => item.id === projectId);
   if (!project) {
     toast.error(t("errors.projectNotFound"));
     return;
   }
 
-  configuringProject.value = project;
-  showProjectImportModal.value = true;
+  openProjectImportModal(project);
 }
 
 async function handleConflictResolution(resolution: "keep" | "overwrite" | "coexist", coexistName?: string) {
@@ -261,13 +242,10 @@ async function handleConflictResolution(resolution: "keep" | "overwrite" | "coex
 
   await resolveConflict(currentConflictSkill.value, resolution, coexistName);
   closeConflictModal();
-
-  // Refresh local skills after resolution
   await scanLocalSkills();
 
-  // Re-scan project skills to update the import modal
   if (selectedProjectId.value) {
-    const project = projects.value.find((p) => p.id === selectedProjectId.value);
+    const project = projects.value.find((item) => item.id === selectedProjectId.value);
     if (project) {
       await scanProjectSkills(project.path);
     }
@@ -279,8 +257,8 @@ async function handleConflictResolution(resolution: "keep" | "overwrite" | "coex
 async function handleImportSelected(skillPaths: string[]) {
   if (skillPaths.length === 0) return;
 
-  busy.value = true;
-  busyText.value = t("messages.importing");
+  localBusy.value = true;
+  localBusyText.value = t("messages.importing");
 
   try {
     let successCount = 0;
@@ -305,14 +283,14 @@ async function handleImportSelected(skillPaths: string[]) {
       toast.error(t("errors.importFailed"));
     }
 
-    showProjectImportModal.value = false;
+    closeProjectExportModal();
     await scanLocalSkills();
     await refreshProjectSkillSnapshots();
   } catch (err) {
     toast.error(getErrorMessage(err, t("errors.importFailed")));
   } finally {
-    busy.value = false;
-    busyText.value = "";
+    localBusy.value = false;
+    localBusyText.value = "";
   }
 }
 
@@ -327,7 +305,6 @@ async function handleResolveConflictFromImport(skill: ProjectSkill) {
   openConflictModal(skill);
 }
 
-// Version management handlers
 function handleManageVersions(skill: LocalSkill) {
   currentManagedSkillPath.value = skill.path;
   selectedCreateVersionSourcePath.value = "";
@@ -339,27 +316,13 @@ function handleManageVersions(skill: LocalSkill) {
   openVersionManagerModal(skill.currentVersion?.skillId || skill.id);
 }
 
-const comparingFromVersion = ref<SkillVersion | null>(null);
-const comparingToVersion = ref<SkillVersion | null>(null);
-const currentDiff = ref<SkillDiff | null>(null);
-const currentManagedSkillPath = ref("");
-const selectedCreateVersionSourcePath = ref("");
-const versionImportProjectId = ref<string | null>(null);
-const versionImportProjectSkills = ref<ProjectSkill[]>([]);
-const versionImportProjectSkillsLoading = ref(false);
-const projectSkillSnapshots = ref<Record<string, ProjectSkill[]>>({});
-let projectSnapshotRefreshTimer: number | null = null;
-
 async function handleCompareVersions(fromVersionId: string, toVersionId: string) {
   if (!currentSkillPackage.value) return;
 
-  const fromVersion = currentSkillPackage.value.versions.find(v => v.id === fromVersionId) || null;
-  const toVersion = currentSkillPackage.value.versions.find(v => v.id === toVersionId) || null;
-
-  comparingFromVersion.value = fromVersion;
-  comparingToVersion.value = toVersion;
-
-  currentDiff.value = await compareVersions(currentSkillPackage.value.id, fromVersionId, toVersionId);
+  const fromVersion = currentSkillPackage.value.versions.find((item) => item.id === fromVersionId) || null;
+  const toVersion = currentSkillPackage.value.versions.find((item) => item.id === toVersionId) || null;
+  const diff = await compareVersions(currentSkillPackage.value.id, fromVersionId, toVersionId);
+  setComparisonVersions(fromVersion, toVersion, diff);
   openVersionDiffModal();
 }
 
@@ -393,8 +356,7 @@ async function handlePickSourcePath() {
 
 async function handlePickVersionImportProject(projectId: string) {
   const project = projects.value.find((item) => item.id === projectId);
-  versionImportProjectId.value = projectId;
-  versionImportProjectSkills.value = [];
+  setVersionImportProject(projectId, [], false);
 
   if (!project) {
     return;
@@ -403,7 +365,7 @@ async function handlePickVersionImportProject(projectId: string) {
   versionImportProjectSkillsLoading.value = true;
   try {
     const result = await scanProjectSkills(project.path, { silent: true });
-    versionImportProjectSkills.value = result?.skills ?? [];
+    setVersionImportProject(projectId, result?.skills ?? [], false);
     projectSkillSnapshots.value = {
       ...projectSkillSnapshots.value,
       [project.id]: result?.skills ?? []
@@ -413,85 +375,18 @@ async function handlePickVersionImportProject(projectId: string) {
   }
 }
 
-async function refreshProjectSkillSnapshots() {
-  const nextSnapshots: Record<string, ProjectSkill[]> = {};
-  for (const project of projects.value) {
-    const result = await scanProjectSkills(project.path, { silent: true });
-    nextSnapshots[project.id] = result?.skills ?? [];
-  }
-  projectSkillSnapshots.value = nextSnapshots;
-}
-
-function restartProjectSnapshotRefreshLoop() {
-  if (projectSnapshotRefreshTimer !== null) {
-    window.clearInterval(projectSnapshotRefreshTimer);
-  }
-  projectSnapshotRefreshTimer = window.setInterval(() => {
-    void refreshProjectSkillSnapshots();
-  }, 30000);
-}
-
-async function handleRenameVersion(versionId: string, newName: string) {
-  if (!currentSkillPackage.value) return;
-  await renameVersion(currentSkillPackage.value.id, versionId, newName);
-}
-
-async function handleDeleteVersion(versionId: string, strategy: "soft" | "archive" | "hard", force: boolean) {
-  if (!currentSkillPackage.value) return;
-  await deleteVersion(currentSkillPackage.value.id, versionId, strategy, force);
-}
-
-async function handleSetDefaultVersion(versionId: string) {
-  if (!currentSkillPackage.value) return;
-  await setDefaultVersion(currentSkillPackage.value.id, versionId);
-}
-
-async function handleCreateVariant(versionId: string, name: string, description?: string) {
-  if (!currentSkillPackage.value) return;
-  await createVariant({
-    skillId: currentSkillPackage.value.id,
-    versionId,
-    name,
-    description
-  });
-}
-
-async function handleDeleteVariant(variantId: string) {
-  if (!currentSkillPackage.value) return;
-  await deleteVariant({
-    skillId: currentSkillPackage.value.id,
-    variantId
-  });
-}
-
-async function handleUpdateVariant(
-  variantId: string,
-  newName?: string,
-  newVersionId?: string,
-  newDescription?: string
-) {
-  if (!currentSkillPackage.value) return;
-  await updateVariant({
-    skillId: currentSkillPackage.value.id,
-    variantId,
-    newName,
-    newVersionId,
-    newDescription
-  });
-}
-
 async function handleCloneSkillsToProject(skillIds: string[], ideLabels: string[]) {
   if (!configuringProject.value) return;
 
-  busy.value = true;
-  busyText.value = t("messages.cloningSkillsToProject");
+  localBusy.value = true;
+  localBusyText.value = t("messages.cloningSkillsToProject");
 
   try {
     let successCount = 0;
     let failCount = 0;
 
     for (const skillId of skillIds) {
-      const skill = localSkills.value.find(s => s.id === skillId);
+      const skill = localSkills.value.find((item) => item.id === skillId);
       if (!skill) continue;
 
       try {
@@ -500,7 +395,6 @@ async function handleCloneSkillsToProject(skillIds: string[], ideLabels: string[
           const projectPath = configuringProject.value.path;
           const ideDir = buildProjectCloneTargetPath(projectPath, ideLabel);
           if (!ideDir) continue;
-          
           installTargets.push({
             name: ideLabel,
             path: ideDir
@@ -527,7 +421,7 @@ async function handleCloneSkillsToProject(skillIds: string[], ideLabels: string[
 
     if (successCount > 0) {
       toast.success(t("messages.skillsClonedToProject", { success: successCount, failed: failCount }));
-      showProjectImportModal.value = false;
+      closeProjectImportModal();
       await scanLocalSkills();
       await refreshProjectSkillSnapshots();
     } else {
@@ -536,8 +430,8 @@ async function handleCloneSkillsToProject(skillIds: string[], ideLabels: string[
   } catch (err) {
     toast.error(getErrorMessage(err, t("errors.cloneToProjectFailed")));
   } finally {
-    busy.value = false;
-    busyText.value = "";
+    localBusy.value = false;
+    localBusyText.value = "";
   }
 }
 </script>
@@ -550,32 +444,16 @@ async function handleCloneSkillsToProject(skillIds: string[], ideLabels: string[
         <button class="tab" :class="{ active: activeTab === 'local' }" @click="activeTab = 'local'">
           {{ t("app.tabs.local") }}
         </button>
-        <button
-          class="tab"
-          :class="{ active: activeTab === 'market' }"
-          @click="activeTab = 'market'"
-        >
+        <button class="tab" :class="{ active: activeTab === 'market' }" @click="activeTab = 'market'">
           {{ t("app.tabs.market") }}
         </button>
-        <button
-          class="tab"
-          :class="{ active: activeTab === 'ide' }"
-          @click="activeTab = 'ide'"
-        >
+        <button class="tab" :class="{ active: activeTab === 'ide' }" @click="activeTab = 'ide'">
           {{ t("app.tabs.ide") }}
         </button>
-        <button
-          class="tab"
-          :class="{ active: activeTab === 'projects' }"
-          @click="activeTab = 'projects'"
-        >
+        <button class="tab" :class="{ active: activeTab === 'projects' }" @click="activeTab = 'projects'">
           {{ t("app.tabs.projects") }}
         </button>
-        <button
-          class="tab"
-          :class="{ active: activeTab === 'settings' }"
-          @click="activeTab = 'settings'"
-        >
+        <button class="tab" :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">
           {{ t("app.tabs.settings") }}
         </button>
       </div>
@@ -586,7 +464,7 @@ async function handleCloneSkillsToProject(skillIds: string[], ideLabels: string[
             type="button"
             :aria-label="t('app.header.language')"
             :title="locale === 'zh-CN' ? '中文' : 'English'"
-            @click="locale = locale === 'zh-CN' ? 'en-US' : 'zh-CN'"
+            @click="toggleLocale"
           >
             <span class="lang-badge">{{ locale === "zh-CN" ? "EN" : "中" }}</span>
           </button>
@@ -597,19 +475,13 @@ async function handleCloneSkillsToProject(skillIds: string[], ideLabels: string[
             type="button"
             :aria-label="t('app.header.theme')"
             :title="theme === 'light' ? t('app.header.themeLight') : t('app.header.themeDark')"
-            @click="theme = theme === 'light' ? 'dark' : 'light'"
+            @click="toggleTheme"
           >
             <svg v-if="theme === 'light'" class="icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M12 4a1 1 0 011 1v1a1 1 0 11-2 0V5a1 1 0 011-1Zm6.36 2.64a1 1 0 010 1.41l-.7.7a1 1 0 11-1.41-1.41l.7-.7a1 1 0 011.41 0ZM20 11a1 1 0 010 2h-1a1 1 0 110-2h1Zm-8 2a3 3 0 100-6 3 3 0 000 6Zm-7 0a1 1 0 010-2H4a1 1 0 110-2h1a1 1 0 110 2H4a1 1 0 010 2Zm1.64-7.95a1 1 0 011.41 0l.7.7a1 1 0 11-1.41 1.41l-.7-.7a1 1 0 010-1.41ZM12 18a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1Zm7.07-1.07a1 1 0 010 1.41l-.7.7a1 1 0 11-1.41-1.41l.7-.7a1 1 0 011.41 0ZM6.34 16.93a1 1 0 011.41 0l.7.7a1 1 0 11-1.41 1.41l-.7-.7a1 1 0 010-1.41Z"
-                fill="currentColor"
-              />
+              <path d="M12 4a1 1 0 011 1v1a1 1 0 11-2 0V5a1 1 0 011-1Zm6.36 2.64a1 1 0 010 1.41l-.7.7a1 1 0 11-1.41-1.41l.7-.7a1 1 0 011.41 0ZM20 11a1 1 0 010 2h-1a1 1 0 110-2h1Zm-8 2a3 3 0 100-6 3 3 0 000 6Zm-7 0a1 1 0 010-2H4a1 1 0 110-2h1a1 1 0 110 2H4a1 1 0 010 2Zm1.64-7.95a1 1 0 011.41 0l.7.7a1 1 0 11-1.41 1.41l-.7-.7a1 1 0 010-1.41ZM12 18a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1Zm7.07-1.07a1 1 0 010 1.41l-.7.7a1 1 0 11-1.41-1.41l.7-.7a1 1 0 011.41 0ZM6.34 16.93a1 1 0 011.41 0l.7.7a1 1 0 11-1.41 1.41l-.7-.7a1 1 0 010-1.41Z" fill="currentColor" />
             </svg>
             <svg v-else class="icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M21 14.5A8.5 8.5 0 019.5 3a.9.9 0 00-.9.9 9.6 9.6 0 0010.5 10.5.9.9 0 00.9-.9Z"
-                fill="currentColor"
-              />
+              <path d="M21 14.5A8.5 8.5 0 019.5 3a.9.9 0 00-.9.9 9.6 9.6 0 0010.5 10.5.9.9 0 00.9-.9Z" fill="currentColor" />
             </svg>
           </button>
         </div>
@@ -682,17 +554,17 @@ async function handleCloneSkillsToProject(skillIds: string[], ideLabels: string[
       </template>
 
       <template v-else-if="activeTab === 'projects'">
-      <ProjectsPanel
-        :projects="projects"
-        :selected-project-id="selectedProjectId"
-        :local-skills="localSkills"
-        :ide-options="ideOptions"
-        :project-skill-snapshots="projectSkillSnapshots"
-        :local-loading="localLoading"
-        @add-project="handleAddProject"
+        <ProjectsPanel
+          :projects="projects"
+          :selected-project-id="selectedProjectId"
+          :local-skills="localSkills"
+          :ide-options="ideOptions"
+          :project-skill-snapshots="projectSkillSnapshots"
+          :local-loading="localLoading"
+          @add-project="openProjectAddModal"
           @remove-project="handleRemoveProject"
           @select-project="handleSelectProject"
-          @configure-project="handleConfigureProject"
+          @configure-project="(id) => { const project = projects.find((item) => item.id === id); if (project) openProjectConfigModal(project); }"
           @export-skills="handleExportSkills"
           @import-skills="handleImportSkills"
         />
@@ -703,60 +575,13 @@ async function handleCloneSkillsToProject(skillIds: string[], ideLabels: string[
       </template>
     </main>
 
-    <InstallModal
-      :visible="showInstallModal"
-      :ide-options="ideOptions"
-      :projects="projects"
-      @confirm="confirmInstallToIde"
-      @cancel="closeInstallModal"
-    />
-
-    <UninstallModal
-      :visible="showUninstallModal"
-      :target-name="uninstallTargetName"
-      :mode="uninstallMode"
-      @confirm="confirmUninstall"
-      @cancel="cancelUninstall"
-    />
-
-    <ProjectAddModal
-      :visible="showProjectAddModal"
-      @close="showProjectAddModal = false"
-      @confirm="handleProjectAddConfirm"
-    />
-
-    <ProjectConfigModal
-      :visible="showProjectConfigModal"
-      :project="configuringProject"
-      :ide-options="ideOptions"
-      @close="() => { showProjectConfigModal = false; configuringProject = null; }"
-      @save="handleProjectConfigSave"
-    />
-
-    <ConflictResolutionModal
-      :show="showConflictModal"
-      :skill="currentConflictSkill"
-      :conflict-analysis="currentConflictAnalysis"
-      @close="closeConflictModal"
-      @resolve="handleConflictResolution"
-    />
-
-    <ProjectSkillImportModal
-      :show="showProjectExportModal"
-      :scan-result="projectSkillScanResult"
-      @close="showProjectExportModal = false"
-      @import="handleImportSelected"
-      @resolve-conflict="handleResolveConflictFromImport"
-    />
-
-    <ImportToProjectModal
-      :show="showProjectImportModal"
-      :project="configuringProject"
-      :local-skills="localSkills"
-      @close="showProjectImportModal = false"
-      @clone="handleCloneSkillsToProject"
-    />
-
+    <InstallModal :visible="showInstallModal" :ide-options="ideOptions" :projects="projects" @confirm="confirmInstallToIde" @cancel="closeInstallModal" />
+    <UninstallModal :visible="showUninstallModal" :target-name="uninstallTargetName" :mode="uninstallMode" @confirm="confirmUninstall" @cancel="cancelUninstall" />
+    <ProjectAddModal :visible="showProjectAddModal" @close="closeProjectAddModal" @confirm="handleProjectAddConfirm" />
+    <ProjectConfigModal :visible="showProjectConfigModal" :project="configuringProject" :ide-options="ideOptions" @close="closeProjectConfigModal" @save="handleProjectConfigSave" />
+    <ConflictResolutionModal :show="showConflictModal" :skill="currentConflictSkill" :conflict-analysis="currentConflictAnalysis" @close="closeConflictModal" @resolve="handleConflictResolution" />
+    <ProjectSkillImportModal :show="showProjectExportModal" :scan-result="projectSkillScanResult" @close="closeProjectExportModal" @import="handleImportSelected" @resolve-conflict="handleResolveConflictFromImport" />
+    <ImportToProjectModal :show="showProjectImportModal" :project="configuringProject" :local-skills="localSkills" @close="closeProjectImportModal" @clone="handleCloneSkillsToProject" />
     <VersionManagerModal
       :show="showVersionManagerModal"
       :skill-package="currentSkillPackage"
@@ -768,34 +593,24 @@ async function handleCloneSkillsToProject(skillIds: string[], ideLabels: string[
       :project-skills-loading="versionImportProjectSkillsLoading"
       :loading="versionLoading"
       @close="closeVersionManagerModal"
-      @rename="handleRenameVersion"
-      @delete="handleDeleteVersion"
-      @set-default="handleSetDefaultVersion"
+      @rename="renameVersion"
+      @delete="deleteVersion"
+      @set-default="setDefaultVersion"
       @compare="handleCompareVersions"
       @create-version="handleCreateVersion"
       @pick-source-path="handlePickSourcePath"
       @pick-project="handlePickVersionImportProject"
-      @create-variant="handleCreateVariant"
-      @update-variant="handleUpdateVariant"
-      @delete-variant="handleDeleteVariant"
+      @create-variant="createVariant"
+      @update-variant="updateVariant"
+      @delete-variant="deleteVariant"
     />
-
-    <VersionDiffModal
-      :show="showVersionDiffModal"
-      :diff="currentVersionDiff || currentDiff"
-      :from-version="comparingFromVersion"
-      :to-version="comparingToVersion"
-      @close="closeVersionDiffModal"
-    />
-
+    <VersionDiffModal :show="showVersionDiffModal" :diff="currentVersionDiff || currentDiff" :from-version="comparingFromVersion" :to-version="comparingToVersion" @close="closeVersionDiffModal" />
     <Toast />
-
-    <LoadingOverlay :visible="busy" :text="busyText" />
+    <LoadingOverlay :visible="displayBusy" :text="displayBusyText" />
   </div>
 </template>
 
 <style>
-/* Global styles moved from App.vue */
 :root {
   --color-bg: #f5f5f7;
   --color-text: #1d1d1f;
@@ -887,7 +702,6 @@ button {
   font-family: inherit;
 }
 
-/* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -960,21 +774,6 @@ button {
   background: var(--color-tab-active-bg);
   color: var(--color-tab-active-text);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.tab-badge {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 8px;
-  height: 8px;
-  background: #ff3b30;
-  border-radius: 50%;
-  border: 2px solid var(--color-tab-active-bg);
-}
-
-.tab.active .tab-badge {
-  border-color: var(--color-tab-active-bg);
 }
 
 .header-controls {
