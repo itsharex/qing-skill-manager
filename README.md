@@ -9,10 +9,8 @@ Qing Skill Manager is a forked and repackaged cross-platform AI Skills Manager. 
 
 This project is built on top of the original [skills-manager](https://github.com/Rito-w/skills-manager). Thanks to the original author and contributors for creating the foundation this fork extends.
 
-![Local](docs/screenshots/en-US/local.png)
-![Market](docs/screenshots/en-US/market.png)
-![IDE](docs/screenshots/en-US/ide.png)
-![Project](docs/screenshots/en-US/project.png)
+> Screenshots are being refreshed for the Qing Skill Manager rebrand.
+> Legacy screenshots from the upstream project have been removed to avoid branding confusion.
 
 ## ✨ Core Features
 
@@ -113,4 +111,4 @@ pnpm tauri build
 
 ## 📄 License
 
-TBD
+MIT

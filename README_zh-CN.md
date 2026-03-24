@@ -9,9 +9,8 @@ Qing Skill Manager 是一个基于原项目重新包装与定制的跨平台 AI 
 
 本项目基于原始项目 [skills-manager](https://github.com/Rito-w/skills-manager) 二次开发。感谢原作者和贡献者提供的基础实现。
 
-![Local](docs/screenshots/zh-CN/local.png)
-![Market](docs/screenshots/zh-CN/market.png)
-![IDE](docs/screenshots/zh-CN/ide.png)
+> 截图正在根据 Qing Skill Manager 新品牌重新制作。
+> 为避免与上游项目混淆，已移除继承自原项目的旧截图。
 
 ## ✨ 核心特性
 
@@ -112,4 +111,4 @@ pnpm tauri build
 
 ## 📄 License
 
-TBD
+MIT
