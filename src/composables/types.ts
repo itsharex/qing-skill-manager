@@ -29,7 +29,7 @@ export type MarketStatus = {
  */
 export type InstallResult = {
   installedPath: string;
-  linked: string[];
+  installed: string[];
   skipped: string[];
 };
 
@@ -78,9 +78,6 @@ export type IdeOption = {
   projectDir?: string;
 };
 
-/**
- * Link target for skill installation
- */
 export type LinkTarget = {
   name: string;
   path: string;
@@ -121,7 +118,7 @@ export type ProjectConfig = {
 /**
  * Status of a project-level skill import classification
  */
-export type ProjectSkillImportStatus = "new" | "duplicate" | "conflict";
+export type ProjectSkillImportStatus = "new" | "duplicate" | "managed_version" | "conflict";
 
 /**
  * Project-level skill discovered during import scan
@@ -133,7 +130,11 @@ export type ProjectSkill = {
   path: string;
   status: ProjectSkillImportStatus;
   existingRegistrySkill?: LocalSkill;
+  matchedRegistrySkill?: LocalSkill;
   currentVersion?: SkillVersion;
+  matchedVersionId?: string;
+  matchedVersionName?: string;
+  matchesDefaultVersion?: boolean;
 };
 
 /**
@@ -144,6 +145,7 @@ export type ProjectSkillScanResult = {
   skills: ProjectSkill[];
   newCount: number;
   duplicateCount: number;
+  managedVersionCount: number;
   conflictCount: number;
 };
 
@@ -225,6 +227,7 @@ export type SkillPackage = {
   name: string;
   namespace: string;
   defaultVersion: string;
+  defaultVersionSource?: "explicit" | "strategy";
   versions: SkillVersion[];
   variants: SkillVariant[];
   createdAt: number;

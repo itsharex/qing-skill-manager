@@ -87,7 +87,7 @@ pub struct LinkTarget {
 #[serde(rename_all = "camelCase")]
 pub struct InstallResult {
     pub installed_path: String,
-    pub linked: Vec<String>,
+    pub installed: Vec<String>,
     pub skipped: Vec<String>,
 }
 
@@ -107,10 +107,10 @@ pub struct DownloadResult {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct LinkRequest {
+pub struct InstallRequest {
     pub skill_path: String,
     pub skill_name: String,
-    pub link_targets: Vec<LinkTarget>,
+    pub install_targets: Vec<LinkTarget>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -206,6 +206,7 @@ pub struct ProjectIdeDir {
 pub enum ProjectSkillImportStatus {
     New,
     Duplicate,
+    ManagedVersion,
     Conflict,
 }
 
@@ -219,7 +220,11 @@ pub struct ProjectSkill {
     pub path: String,
     pub status: ProjectSkillImportStatus,
     pub existing_registry_skill: Option<LocalSkill>,
+    pub matched_registry_skill: Option<LocalSkill>,
     pub current_version: Option<SkillVersion>,
+    pub matched_version_id: Option<String>,
+    pub matched_version_name: Option<String>,
+    pub matches_default_version: Option<bool>,
 }
 
 /// Result of scanning a project for OpenCode skills
@@ -230,6 +235,7 @@ pub struct ProjectSkillScanResult {
     pub skills: Vec<ProjectSkill>,
     pub new_count: u64,
     pub duplicate_count: u64,
+    pub managed_version_count: u64,
     pub conflict_count: u64,
 }
 
@@ -344,6 +350,7 @@ pub struct SkillPackage {
     pub name: String,
     pub namespace: String,
     pub default_version: String,       // Default version ID
+    pub default_version_source: String,
     pub versions: Vec<SkillVersion>,
     pub variants: Vec<SkillVariant>,
     pub created_at: i64,
@@ -464,6 +471,24 @@ pub struct CreateVersionRequest {
     pub source: SkillVersionSource,
     pub source_url: Option<String>,
     pub parent_version: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AppConfig {
+    pub default_version_strategy: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AppConfigResponse {
+    pub config: AppConfig,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveAppConfigRequest {
+    pub default_version_strategy: String,
 }
 
 #[derive(Serialize, Debug)]
