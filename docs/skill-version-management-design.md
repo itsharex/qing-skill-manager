@@ -141,9 +141,9 @@ interface SkillDiff {
 │       │   │   └── v2.0.0_i7j8k9l/
 │       │   │       └── SKILL.md
 │       │   └── variants/
-│       │       ├── stable -> ../versions/v1.0.0_a1b2c3d   # symlink
-│       │       ├── latest -> ../versions/v2.0.0_i7j8k9l
-│       │       └── custom-variant -> ../versions/v1.1.0_e4f5g6h
+│       │       ├── stable.json                            # variant pointer
+│       │       ├── latest.json
+│       │       └── custom-variant.json
 │       └── skill-b_namespace-b/
 │           └── ...
 ├── index.json                         # 全局索引
@@ -289,7 +289,7 @@ interface ConflictAnalysis {
 | Diff算法 | 中 | 1-2天 | diff crate |
 | 版本管理UI | 高 | 4-5天 | 需要新组件 |
 | 冲突检测升级 | 中 | 2-3天 | 依赖diff算法 |
-| 变体系统 | 中 | 2天 | symlink管理 |
+| 变体系统 | 中 | 2天 | pointer 管理 |
 | 迁移工具 | 中 | 1-2天 | 数据迁移 |
 
 **总工作量**: 约 14-18 天
@@ -423,7 +423,7 @@ pub fn migrate_v1_to_v2() -> Result<MigrationReport, MigrationError> {
 ### 6.2 存储优化
 - 版本内容使用hash命名去重
 - 相同内容只存储一次
-- 变体使用symlink指向版本
+- 变体使用元数据指针指向版本
 - 支持垃圾回收删除未引用版本
 
 ### 6.3 向后兼容

@@ -22,7 +22,7 @@ Skills Manager 是一款专业的跨平台 AI Skills 管理桌面应用，帮助
 ### 1.2 核心价值主张
 
 - **统一仓库**: 将分散在不同 marketplace 的 skills 汇聚到本地统一管理
-- **一键安装**: 通过符号链接快速将 skills 安装到目标 IDE
+- **一键安装**: 通过 clone / copy 快速将 skills 安装到目标 IDE
 - **多 IDE 支持**: 支持 OpenCode、Claude Code、Cursor、VSCode 等多种 AI 开发环境
 - **项目管理**: 按项目组织 skills，实现项目级 skill 配置
 
@@ -280,7 +280,7 @@ Skills Manager 是一款专业的跨平台 AI Skills 管理桌面应用，帮助
 **需求详情**:
 - 支持预定义的 IDE 目录（OpenCode、Claude、Cursor 等）
 - 支持添加自定义 IDE 配置
-- 通过符号链接/目录连接将 skills 链接到 IDE
+- 通过 clone / copy 将 skills 安装到 IDE
 - 浏览 IDE 中已安装的 skills
 - 区分管理的和未管理的 skills
 - 支持从 IDE 卸载 skills
@@ -288,8 +288,7 @@ Skills Manager 是一款专业的跨平台 AI Skills 管理桌面应用，帮助
 **优先级**: P0 (核心功能)
 
 **技术约束**:
-- Unix: 使用符号链接 (symlink)
-- Windows: 优先使用目录连接 (junction)，回退到符号链接
+- 安装与项目分发统一使用目录复制模型
 
 ---
 
@@ -300,7 +299,7 @@ Skills Manager 是一款专业的跨平台 AI Skills 管理桌面应用，帮助
 - 创建和管理项目列表
 - 为每个项目配置目标 IDE
 - 自动检测项目中的 IDE 目录
-- 将本地 skills 链接到项目
+- 将本地 skills 复制到项目
 - 从项目导入 skills 到本地仓库
 - 扫描项目中的现有 skills
 - 处理导入冲突（保留/覆盖/共存）
@@ -425,15 +424,15 @@ interface IdeOption {
 
 ---
 
-#### FR-011: 符号链接管理
-**描述**: 系统必须安全地创建和管理符号链接
+#### FR-011: 目录复制安装
+**描述**: 系统必须安全地创建和管理技能目录副本
 
 **需求详情**:
-- 创建从 IDE 目录到 manager 目录的符号链接
+- 创建从 manager 目录到 IDE 目录的技能副本
 - 验证目标路径在 home 目录内（安全约束）
-- 处理已存在的链接（跳过如果已链接到同一目标）
-- 支持跨文件系统链接（Windows junction）
-- 验证链接目标有效性
+- 处理已存在的目标目录（已存在则跳过）
+- 支持跨文件系统复制
+- 验证目标目录有效性
 
 **优先级**: P0
 
@@ -462,8 +461,8 @@ interface IdeOption {
 
 **需求详情**:
 - 将 IDE 中的 skill 复制到 manager 存储
-- 创建从原位置到 manager 的符号链接
-- 如果链接失败则回退到本地副本
+- 将原位置内容复制到 manager
+- 在原位置恢复本地副本
 - 验证源目录包含 `SKILL.md`
 
 **优先级**: P1
@@ -564,7 +563,7 @@ interface IdeOption {
 
 #### NFR-008: 数据完整性
 - 文件操作具有原子性（或明确的回滚策略）
-- 符号链接创建失败时有回退机制
+- 目录复制失败时有明确错误反馈与安全回退策略
 - 防止数据丢失的确认对话框
 
 #### NFR-009: 恢复能力
@@ -666,7 +665,7 @@ interface IdeOption {
 - **Panels**: LocalPanel, MarketPanel, IdePanel, ProjectsPanel, SettingsPanel
 - **Modals**: InstallModal, UninstallModal, ProjectAddModal, ProjectConfigModal, ConflictResolutionModal
 - **Overlays**: LoadingOverlay, Toast
-- **Utilities**: DownloadQueue, UpdateChecker
+- **Utilities**: DownloadQueue
 
 #### UI-003: IDE 浏览页面 (IdePanel)
 
@@ -686,9 +685,9 @@ interface IdeOption {
 **关键概念**:
 
 **托管 (managed)**:
-- 通过 Skills Manager 安装
+- 通过 Skills Manager 管理
 - 实际存储在 `~/.skills-manager/skills/`
-- IDE 目录中是符号链接
+- IDE 目录中存在可识别的受管副本
 - 可以被统一管理（更新、卸载）
 
 **未托管 (unmanaged)**:
@@ -698,8 +697,8 @@ interface IdeOption {
 - 需要先"纳管"才能统一管理
 
 **来源类型**:
-- **链接 (link)**: skill 是符号链接，实际存储在 manager 目录
-- **本地 (local)**: skill 是实际目录，不是链接
+- **托管副本 (managed copy)**: skill 是复制到 IDE 的受管副本
+- **本地 (local)**: skill 是实际目录，但未被 Manager 识别为受管副本
 
 **注意**: 当前版本默认只配置 OpenCode，其他 IDE 需手动添加或在 `constants.ts` 中扩展 `defaultIdeOptions`。
 
@@ -715,7 +714,7 @@ interface IdeOption {
    - **左列（全局 IDE）**: 安装到 IDE 全局配置目录
    - **右列（项目）**: 安装到特定项目的 IDE 目录
 4. 选择全局 IDE，点击"安装到 IDE"
-5. 调用 `link_local_skill` 命令创建符号链接
+5. 调用 `clone_local_skill` 命令创建技能副本
 
 **项目级 Skill 转成 IDE 全局**:
 
@@ -723,7 +722,7 @@ interface IdeOption {
 1. 在 **IDE 浏览**页面找到项目中的 skill（显示为"未托管"）
 2. 点击"纳管"按钮，执行 `adopt_ide_skill`:
    - 将 skill 从项目目录**复制**到 `~/.skills-manager/skills/`
-   - 在项目目录**创建符号链接**替换原目录
+   - 在项目目录恢复本地副本
 3. 在 **Local Skills** 页面选中刚纳管的 skill
 4. 点击"安装到编辑器"，选择全局 IDE
 
@@ -738,9 +737,9 @@ interface IdeOption {
 
 | 安装目标 | 存储位置 | 适用范围 | 关键命令 |
 |---------|---------|---------|----------|
-| **全局 IDE** | `~/.config/opencode/skills/` (symlink) | 所有项目 | `link_local_skill` |
-| **项目级** | `~/project/.config/opencode/skills/` (symlink) | 仅该项目 | `link_local_skill` |
-| **纳管** | 复制到 `~/.skills-manager/`，原位置变 symlink | - | `adopt_ide_skill` |
+| **全局 IDE** | `~/.config/opencode/skills/` (copy) | 所有项目 | `clone_local_skill` |
+| **项目级** | `~/project/.config/opencode/skills/` (copy) | 仅该项目 | `clone_local_skill` |
+| **纳管** | 复制到 `~/.skills-manager/`，原位置恢复副本 | - | `adopt_ide_skill` |
 | **导入** | 复制到 `~/.skills-manager/skills/` | - | `import_local_skill` |
 
 ---
@@ -768,9 +767,7 @@ interface IdeOption {
 - Params: `q`, `page`, `limit`
 
 #### EI-002: 更新服务
-- Endpoint: `https://github.com/Rito-w/skills-manager/releases/latest/download/latest.json`
-- Protocol: Tauri Updater
-- Signature: Ed25519
+- 当前 fork 已移除内置更新检查。
 
 ---
 
@@ -838,12 +835,12 @@ interface IdeOption {
 | Marketplace | 提供 skills 下载的在线服务 |
 | IDE | 集成开发环境，此处特指 AI 辅助编程工具 |
 | 纳管 | 将 IDE 中的 skill 纳入 Skills Manager 管理 |
-| 链接 | 通过符号连接将 skill 安装到 IDE 目录 |
+| 克隆/复制 | 通过 clone / copy 将 skill 安装到 IDE 目录 |
 | Manager | Skills Manager 应用本身 |
-| **托管 (managed)** | Skill 通过 Skills Manager 安装，实际存储在 `~/.skills-manager/skills/`，IDE 目录中是符号链接 |
+| **托管 (managed)** | Skill 通过 Skills Manager 安装，并能与 manager 中的内容匹配 |
 | **未托管 (unmanaged)** | Skill 是用户手动复制到 IDE 目录的，不在 Manager 控制下，显示橙色边框标记 |
-| **链接 (link)** | Skill 是符号链接，实际存储在 manager 目录 |
-| **本地 (local)** | Skill 是实际目录，不是符号链接 |
+| **托管副本 (managed copy)** | Skill 是复制到 IDE 的受管副本 |
+| **本地 (local)** | Skill 是实际目录，但未被 Skills Manager 纳管 |
 | **全局 IDE 安装** | Skill 安装在 IDE 的全局配置目录（如 `~/.config/opencode/skills/`），对所有项目可用 |
 | **项目级安装** | Skill 安装在特定项目的 IDE 目录（如 `~/project/.config/opencode/skills/`），仅该项目可用 |
 

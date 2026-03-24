@@ -3,7 +3,7 @@
 [English](README.md) | [中文](README_zh-CN.md)
 
 **将 skill 快速安装到 全局/项目** 
-一款专业的跨平台 AI Skills 管理器。支持从各大主流技能市场（如 Claude Plugins、SkillsLLM、SkillsMP 等）进行聚合搜索，一键下载至统一的本地仓库，并可通过符号链接（Symlink）极速分配到任意受支持的 AI 开发环境中。全面兼容 Windows、macOS 与 Linux 操作系统，让您的 AI 编程助手能力无限扩展。
+一款专业的跨平台 AI Skills 管理器。支持从各大主流技能市场（如 Claude Plugins、SkillsLLM、SkillsMP 等）进行聚合搜索，一键下载至统一的本地仓库，并分发到任意受支持的 AI 开发环境中。全面兼容 Windows、macOS 与 Linux 操作系统，让您的 AI 编程助手能力无限扩展。
 
 ![Local](docs/screenshots/zh-CN/local.png)
 ![Market](docs/screenshots/zh-CN/market.png)
@@ -13,9 +13,9 @@
 
 - 🔍 **聚合市场检索**：基于公开 Registry，一站式搜索全网优质 Skills
 - 📦 **统一本地仓库**：集中化管理下载内容 (`~/.skills-manager/skills`)
-- 🚀 **一键极速分发**：以系统软链接形式，将统一的本地 Skills 秒级安装至各个目标 IDE
+- 🚀 **一键极速分发**：将统一的本地 Skills 快速安装至各个目标 IDE
 - 🛠️ **多维管理界面**：支持基于 IDE 的细粒度浏览、无痕安全卸载机制
-- ⚙️ **项目管理**：支持项目管理，将 skills 挂载到项目下，可以配置项目使用的 ide
+- ⚙️ **项目管理**：支持项目管理，将 skills 克隆到项目下，并配置项目使用的 IDE
 
 ## 🎯 原生支持的 IDE（按字母顺序）
 
@@ -36,7 +36,7 @@
 
 ### 📥 获取与使用
 
-- **普通用户（推荐）**：直接前往 [Releases 页面](https://github.com/Rito-w/skills-manager/releases) 下载最新版本安装包即可。
+- **普通用户**：请从源码构建，或在你自己的 fork 中发布版本。
 - **开发者**：拉取源码在本地运行，或进行深度定制。
 
 ### 🍎 macOS 安全使用要求
@@ -55,12 +55,12 @@ xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 ### 🗂️ 2) 本地仓库 (Local Skills)
 
 - 集中俯瞰已下载到设备底层仓库的所有 Skills。
-- 点击“安装”，即可在弹出的面板中勾选一个或多个原生 / 自定义的 IDE 实施批量挂载发布。
+- 点击“安装”，即可在弹出的面板中勾选一个或多个原生 / 自定义的 IDE 进行批量安装。
 
 ### ⌨️ 3) IDE 纬度管理 (IDE Browse)
 
-- 灵活切换工作环境视角（如 VSCode 或 Cursor），独立查看各自已挂载使用的技能列表。
-- 安全卸载模块：仅安全移除软链接；若非软链接则执行物理剔除，相互防干扰。
+- 灵活切换工作环境视角（如 VSCode 或 Cursor），独立查看各自已安装的技能列表。
+- 安全卸载模块：安全移除已安装技能目录，避免相互干扰。
 - 找不到您的生产力工具？只需在右上角轻松创建你的“自定义 IDE”。
 
 ## 👨‍💻 安装与开发
@@ -76,6 +76,15 @@ xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 ```bash
 pnpm install
 pnpm tauri dev
+```
+
+### 测试说明
+
+- 测试脚本文档：[`docs/testing-guide.md`](docs/testing-guide.md)
+- 推荐的项目检查命令：
+
+```bash
+pnpm run check:project
 ```
 
 ### 打包发布

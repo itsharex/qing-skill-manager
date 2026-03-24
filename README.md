@@ -3,7 +3,7 @@
 [English](README.md) | [中文](README_zh-CN.md)
 
 **Quickly install skills to Global/Project**
-A professional cross-platform AI Skills Manager. It empowers you to search for skills across major marketplaces (such as Claude Plugins, SkillsLLM, SkillsMP, etc.), download them into a unified local repository, and securely install them into any supported AI development environment instantly via symlinks. Fully compatible with Windows, macOS, and Linux out-of-the-box, infinitely expanding your AI programming assistants' capabilities.
+A professional cross-platform AI Skills Manager. It empowers you to search for skills across major marketplaces (such as Claude Plugins, SkillsLLM, SkillsMP, etc.), download them into a unified local repository, and securely distribute them into supported AI development environments. Fully compatible with Windows, macOS, and Linux out-of-the-box, infinitely expanding your AI programming assistants' capabilities.
 
 ![Local](docs/screenshots/en-US/local.png)
 ![Market](docs/screenshots/en-US/market.png)
@@ -14,9 +14,9 @@ A professional cross-platform AI Skills Manager. It empowers you to search for s
 
 - 🔍 **Aggregated Market Search**: Search quality skills from public registries in one place
 - 📦 **Unified Local Repository**: Centralized management of downloaded skills (`~/.skills-manager/skills`)
-- 🚀 **One-Click Installation**: Install unified local skills to target IDEs in seconds via symlinks
+- 🚀 **One-Click Installation**: Install unified local skills to target IDEs in seconds
 - 🛠️ **Multi-Dimensional Management**: Browse skills per IDE, uninstall cleanly and safely
-- ⚙️ **Project Management**: Manage projects and mount skills to projects, configure IDEs for each project
+- ⚙️ **Project Management**: Manage projects, clone skills into projects, and configure IDEs per project
 
 ## 🎯 Natively Supported IDEs (Alphabetical Order)
 
@@ -37,7 +37,7 @@ A professional cross-platform AI Skills Manager. It empowers you to search for s
 
 ### 📥 Installation & Usage
 
-- **General Users (Recommended)**: Simply head to the [Releases page](https://github.com/Rito-w/skills-manager/releases) to download the latest executable installer.
+- **General Users**: Build from source or publish releases from your own fork.
 - **Developers**: Clone the source code repository to run locally or customize in-depth.
 
 ### 🍎 macOS Security Note
@@ -56,12 +56,12 @@ xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 ### 🗂️ 2) Local Skills
 
 - Overview of all skills currently downloaded to your local repository.
-- Click "Install" to select target IDEs for deployment via symlinks.
+- Click "Install" to select target IDEs for deployment.
 
 ### ⌨️ 3) IDE Browser
 
-- Switch workspace perspective (e.g., VSCode or Cursor) to view mounted skills for each IDE.
-- Safe Uninstallation: Removes the symlink if linked, or deletes the physical directory if not a symlink.
+- Switch workspace perspective (e.g., VSCode or Cursor) to view installed skills for each IDE.
+- Safe Uninstallation: Removes the installed skill directory safely.
 - Can't find your IDE? Click "Add Custom IDE" in the top right to register its skills directory.
 
 ## 👨‍💻 Installation & Development
@@ -77,6 +77,15 @@ xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 ```bash
 pnpm install
 pnpm tauri dev
+```
+
+### Testing
+
+- Test script documentation: [`docs/testing-guide.md`](docs/testing-guide.md)
+- Recommended project check:
+
+```bash
+pnpm run check:project
 ```
 
 ### Build & Release

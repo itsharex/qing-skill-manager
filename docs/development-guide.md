@@ -17,9 +17,8 @@
 
 - 聚合多个远程 marketplace 的 skill 搜索结果
 - 将 skill 下载到本地统一仓库
-- 通过符号链接把本地 skill 安装到目标 IDE / 项目目录
-- 浏览本地 skills、IDE 中已挂载 skills、项目级 skill 配置
-- 检查应用更新
+- 通过 clone / copy 把本地 skill 安装到目标 IDE / 项目目录
+- 浏览本地 skills、IDE 中已安装 skills、项目级 skill 配置
 
 从代码实现来看，当前项目的能力边界可以概括为：
 
@@ -45,7 +44,6 @@
   - `@tauri-apps/plugin-dialog`
   - `@tauri-apps/plugin-opener`
   - `@tauri-apps/plugin-process`
-  - `@tauri-apps/plugin-updater`
 
 ### 后端
 
@@ -99,7 +97,7 @@ skills-manager/
 
 1. 创建 Vue 应用
 2. 注入 i18n
-3. 挂载根组件 `App.vue`
+3. 渲染根组件 `App.vue`
 
 也就是说，**前端所有功能的真实入口是 `App.vue`**。
 
@@ -199,14 +197,13 @@ Rust 侧入口分两层：
   - 展示项目中扫描到的 skills，执行导入
 
 - `ImportToProjectModal.vue`
-  - 将本地 skills 挂载到项目对应 IDE 目录
+  - 将本地 skills 克隆到项目对应 IDE 目录
 
 #### C. 基础反馈与辅助组件
 
 - `Toast.vue`：全局消息提示
 - `LoadingOverlay.vue`：全局忙碌状态覆盖层
 - `DownloadQueue.vue`：下载队列与状态展示
-- `UpdateChecker.vue`：应用更新 UI
 - `MarketSettingsModal.vue`：远程源配置
 
 ### 5.2 `src/composables/`：核心业务层
@@ -273,18 +270,6 @@ Rust 侧入口分两层：
 
 同样基于 `localStorage`。
 
-#### `useUpdateStore.ts`
-
-负责自动更新流程：
-
-- 获取应用名与版本
-- 启动时静默检查更新
-- 手动检查更新
-- 下载更新
-- 重启安装
-
-这个模块直接依赖 Tauri updater / process 插件。
-
 #### `useToast.ts`
 
 负责全局 toast 状态。
@@ -326,7 +311,7 @@ Rust 侧入口分两层：
 - `search_marketplaces`
 - `download_marketplace_skill`
 - `update_marketplace_skill`
-- `link_local_skill`
+- `clone_local_skill`
 - `scan_overview`
 - `uninstall_skill`
 - `import_local_skill`
@@ -397,7 +382,7 @@ Vue 组件
 
 应用启动时会发生几件关键事情：
 
-1. `main.ts` 挂载 `App.vue`
+1. `main.ts` 渲染 `App.vue`
 2. `App.vue` 在 `onMounted` 中：
    - 加载 locale
    - 加载 theme
@@ -582,7 +567,7 @@ xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 
 - `src-tauri/src/commands/skills.rs`
 
-### 9.4 改项目管理与项目级挂载逻辑
+### 9.4 改项目管理与项目级克隆逻辑
 
 先看：
 
@@ -597,18 +582,9 @@ xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 这里最关键的是理解两件事：
 
 - 项目列表本身由 `useProjectConfig` 管
-- 实际扫描、链接、冲突处理由 `useSkillsManager` 触发 Tauri command 完成
+- 实际扫描、克隆、冲突处理由 `useSkillsManager` 触发 Tauri command 完成
 
-### 9.5 改更新检查逻辑
-
-先看：
-
-- `src/composables/useUpdateStore.ts`
-- `src-tauri/tauri.conf.json`
-
-因为 updater endpoint 与前端更新状态逻辑分别在这两处。
-
-### 9.6 改国际化文案
+### 9.5 改国际化文案
 
 先看：
 
@@ -656,7 +632,7 @@ xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 |------|------|
 | **序号 + 名称** | 如 "1. my-skill" |
 | **IDE 标签** | 显示属于哪个 IDE |
-| **来源类型** | "链接"（symbolic link）或 "本地"（local copy） |
+| **来源类型** | "托管副本"（managed copy）或 "本地"（local copy） |
 | **管理状态** | "未托管"（橙色边框）或已托管 |
 | **完整路径** | skill 的绝对路径 |
 
@@ -672,12 +648,12 @@ xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 #### 关键概念
 
 **托管 vs 未托管**
-- **托管 (managed)**: 通过 Skills Manager 安装，实际存储在 `~/.skills-manager/skills/`，IDE 目录中是符号链接
+- **托管 (managed)**: 通过 Skills Manager 管理，并能与 manager 中的内容匹配
 - **未托管 (unmanaged)**: 用户手动复制到 IDE 目录，不在 Manager 控制下
 
 **链接 vs 本地**
-- **链接 (link)**: skill 是符号链接，实际存储在 manager 目录
-- **本地 (local)**: skill 是实际目录，不是链接
+- **托管副本 (managed copy)**: skill 是复制到 IDE 的受管副本
+- **本地 (local)**: skill 是未被 Manager 识别的本地目录
 
 **注意**: 当前代码默认只配置了 OpenCode，其他 IDE 需要手动添加或在 `constants.ts` 中扩展 `defaultIdeOptions`。
 
@@ -685,7 +661,7 @@ xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
 
 ### 10.2 Skill 安装流程详解
 
-**核心命令**: `link_local_skill`（Rust 后端）
+**核心命令**: `clone_local_skill`（Rust 后端）
 
 #### 安装到全局 IDE
 
@@ -697,14 +673,14 @@ xattr -dr com.apple.quarantine "/Applications/skills-manager-gui.app"
    - **右列（项目）**: 安装到特定项目的 IDE 目录
 4. 选择全局 IDE（如 OpenCode）
 5. 点击"安装到 IDE"
-6. 调用 `link_local_skill` 命令：
+6. 调用 `clone_local_skill` 命令：
 
 ```rust
-invoke("link_local_skill", {
+invoke("clone_local_skill", {
   request: {
     skillPath: "~/.skills-manager/skills/my-skill",
     skillName: "my-skill",
-    linkTargets: [
+    installTargets: [
       { name: "OpenCode", path: "~/.config/opencode/skills" }
     ]
   }
@@ -713,10 +689,8 @@ invoke("link_local_skill", {
 
 **实际执行**（Rust 后端）:
 1. **验证**: 确认 skill 路径在 `~/.skills-manager/skills/` 内
-2. **创建符号链接**: 在 IDE 目录创建指向 manager 目录的 symlink
-   - Unix: `ln -s ~/.skills-manager/skills/my-skill ~/.config/opencode/skills/my-skill`
-   - Windows: `mklink /J` (junction)
-3. **返回结果**: 哪些目标链接成功，哪些被跳过
+2. **复制目录**: 在 IDE 目录创建 skill 的物理副本
+3. **返回结果**: 哪些目标安装成功，哪些被跳过
 
 #### 项目级 Skill 转成 IDE 全局
 
@@ -730,14 +704,14 @@ invoke("link_local_skill", {
 2. **点击"纳管"按钮**
    - 执行 `adopt_ide_skill` 命令
    - 将 skill 从项目目录**复制**到 `~/.skills-manager/skills/`
-   - 在项目目录**创建符号链接**（替换原目录）
+   - 在项目目录恢复一份本地副本
    - 现在 skill 已是"托管"状态
 
 3. **在 Local Skills 页面安装到全局 IDE**
    - 选中刚纳管的 skill
    - 点击"安装到编辑器"
    - 选择全局 IDE（如 OpenCode）
-   - 执行 `link_local_skill`，在全局 IDE 目录创建符号链接
+   - 执行 `clone_local_skill`，在全局 IDE 目录创建副本
 
 **方法 2: 从项目导入**
 
@@ -760,9 +734,9 @@ invoke("link_local_skill", {
 
 | 安装目标 | 存储位置 | 适用范围 | 命令 |
 |---------|---------|---------|------|
-| **全局 IDE** | `~/.config/opencode/skills/` (symlink) | 所有项目 | `link_local_skill` |
-| **项目级** | `~/project/.config/opencode/skills/` (symlink) | 仅该项目 | `link_local_skill` |
-| **纳管** | 复制到 `~/.skills-manager/`，原位置变 symlink | - | `adopt_ide_skill` |
+| **全局 IDE** | `~/.config/opencode/skills/` (copy) | 所有项目 | `clone_local_skill` |
+| **项目级** | `~/project/.config/opencode/skills/` (copy) | 仅该项目 | `clone_local_skill` |
+| **纳管** | 复制到 `~/.skills-manager/`，原位置恢复副本 | - | `adopt_ide_skill` |
 | **导入** | 复制到 `~/.skills-manager/skills/` | - | `import_local_skill` |
 
 ---
@@ -833,12 +807,12 @@ invoke("link_local_skill", {
 - 但用户只能在 UI 上看到 OpenCode 的筛选按钮
 - 要看其他 IDE 的 skills，需要手动添加自定义 IDE
 
-### 11.5 Skill 安装的核心是符号链接
+### 11.5 Skill 安装的核心是 clone / copy
 
 很多用户可能误解"安装"是复制文件，实际上：
-- **安装** = 创建符号链接（symlink/junction）
-- **卸载** = 删除符号链接（不删除实际文件）
-- **纳管** = 复制到 manager + 创建符号链接替换原文件
+- **安装** = 复制 skill 目录到目标位置
+- **卸载** = 删除已复制的目录
+- **纳管** = 复制到 manager + 在原位置恢复本地副本
 - **删除** = 只删除 manager 目录中的实际文件
 
 理解这一点对排查问题很重要。
