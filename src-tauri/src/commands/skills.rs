@@ -1081,7 +1081,13 @@ pub fn scan_project_opencode_skills(
             {
                 matched_registry_skill = Some(candidate.clone());
                 if let Some(version) = candidate.current_version.clone() {
-                    matched_version = Some((version.clone(), version.id.clone()));
+                    let default_version = get_skill_package(GetSkillPackageRequest {
+                        skill_id: version.skill_id.clone(),
+                    })
+                    .ok()
+                    .map(|package| package.package.default_version)
+                    .unwrap_or_else(|| version.id.clone());
+                    matched_version = Some((version.clone(), default_version));
                 }
                 break;
             }
@@ -1567,10 +1573,11 @@ pub fn save_app_config(request: SaveAppConfigRequest) -> Result<AppConfigRespons
 #[cfg(test)]
 mod tests {
     use super::{
-        adopt_ide_skill, build_skill_diff, classify_conflict, clone_local_skill,
-        parse_skill_metadata, read_app_config, resolve_default_version,
-        save_app_config, scan_overview, scan_project_opencode_skills,
-        select_strategy_default_version, simple_hash, uninstall_skill, write_app_config,
+        adopt_ide_skill, build_skill_diff, build_skill_version, classify_conflict,
+        clone_local_skill, package_state_path, parse_skill_metadata, read_app_config,
+        resolve_default_version, save_app_config, scan_overview,
+        scan_project_opencode_skills, select_strategy_default_version, simple_hash,
+        uninstall_skill, write_app_config, write_package_state, StoredPackageState,
     };
     use crate::types::{
         AdoptIdeSkillRequest, AppConfig, ConflictSeverity, ConflictType, IdeDir,
@@ -2137,6 +2144,19 @@ mod tests {
             &format!("demo-project-managed-b-{}", unique),
             "---\nname: Demo Project Managed\ncategory:\n  - richer\nversion: 1.1.0\nnamespace: default\n---\nImported content\n",
         );
+
+        let first_version = build_skill_version(&first_manager_dir, SkillVersionSource::Migration);
+        let second_version = build_skill_version(&second_manager_dir, SkillVersionSource::Migration);
+        write_package_state(
+            &home,
+            &first_version.skill_id,
+            &StoredPackageState {
+                default_version: Some(first_version.id.clone()),
+                variants: Vec::new(),
+            },
+        )
+        .expect("persist explicit default version");
+
         write_skill_dir(
             &project_skills_root,
             "demo-project-managed-copy",
@@ -2156,11 +2176,12 @@ mod tests {
         let skill = result.skills.first().expect("project skill exists");
         assert_eq!(skill.status, crate::types::ProjectSkillImportStatus::ManagedVersion);
         assert!(skill.matched_registry_skill.is_some());
-        assert!(skill.matched_version_id.is_some());
+        assert_eq!(skill.matched_version_id.as_deref(), Some(second_version.id.as_str()));
         assert_eq!(skill.matches_default_version, Some(false));
 
         let _ = fs::remove_dir_all(first_manager_dir);
         let _ = fs::remove_dir_all(second_manager_dir);
+        let _ = fs::remove_file(package_state_path(&home, &first_version.skill_id));
         let _ = fs::remove_dir_all(home.join(".skills-manager-test").join(unique));
     }
 }
