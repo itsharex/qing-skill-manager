@@ -61,14 +61,10 @@ function getVersionUsage(versionId: string): { ideCount: number; projectCount: n
 }
 
 function getVersionDeployments(versionId: string) {
-  const allInst = props.librarySkill?.installations.filter((i) => i.versionId === versionId) || [];
-  // Dedup by path
-  const seen = new Set<string>();
-  const installations = allInst.filter((i) => {
-    if (seen.has(i.skillPath)) return false;
-    seen.add(i.skillPath);
-    return true;
-  });
+  // Only global installations — project-level shown via project mappings below
+  const installations = props.librarySkill?.installations.filter(
+    (i) => i.versionId === versionId && i.scope === "global"
+  ) || [];
   const projects = props.librarySkill?.projectMappings.filter((p) => p.versionId === versionId) || [];
   return { installations, projects };
 }
