@@ -122,7 +122,12 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
     });
 
     // Add unmanaged IDE skills not in central repo
-    const managedNames = new Set(repoSkills.map((s) => s.name));
+    // Match by name (case-insensitive) and also by directory name from path
+    const managedNames = new Set(repoSkills.map((s) => s.name.toLowerCase()));
+    for (const s of repoSkills) {
+      const dirName = s.path.split("/").pop();
+      if (dirName) managedNames.add(dirName.toLowerCase());
+    }
     const unmanagedMap = new Map<string, LibrarySkill>();
 
     function getSourceLabel(ideSkill: IdeSkill): string {
@@ -133,7 +138,8 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
     }
 
     for (const ideSkill of ideSkills.value) {
-      if (ideSkill.managed || managedNames.has(ideSkill.name) || ideSkill.scope === "plugin") {
+      const ideSkillDirName = ideSkill.path.split("/").pop()?.toLowerCase() || "";
+      if (ideSkill.managed || managedNames.has(ideSkill.name.toLowerCase()) || managedNames.has(ideSkillDirName) || ideSkill.scope === "plugin") {
         continue;
       }
       const scope = ideSkill.scope as "global" | "project";
