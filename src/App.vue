@@ -229,14 +229,27 @@ async function handleAdoptToRepo(path: string) {
   }
 }
 
-async function handleAdoptManyToRepo(paths: string[]) {
+async function handleAdoptManyToRepo(targets: Array<{ path: string; ideLabel: string }>) {
+  localBusy.value = true;
+  localBusyText.value = t("messages.adopting");
+  let successCount = 0;
+  let failCount = 0;
   try {
-    for (const path of paths) {
-      await invoke("import_local_skill", { request: { sourcePath: path } });
+    for (const target of targets) {
+      try {
+        await invoke("adopt_ide_skill", {
+          request: { targetPath: target.path, ideLabel: target.ideLabel || "IDE" }
+        });
+        successCount++;
+      } catch (err) {
+        failCount++;
+        console.warn("Failed to adopt skill:", target.path, err);
+      }
     }
     await scanLocalSkills();
-  } catch (err) {
-    console.error("Failed to batch adopt skills:", err);
+  } finally {
+    localBusy.value = false;
+    localBusyText.value = "";
   }
 }
 

@@ -76,6 +76,8 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
     const repoSkills = localSkills.value.map((localSkill): LibrarySkill => {
       // Build version summaries from currentSkillPackage if available
       const versions: LibraryVersionSummary[] = buildVersionSummaries(localSkill);
+      const skillId = localSkill.currentVersion?.skillId || localSkill.id;
+      const hasFullPackage = currentSkillPackage.value?.id === skillId;
 
       // Determine status
       const status = determineSkillStatus(localSkill, ideSkills.value);
@@ -100,6 +102,12 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
       // Display path: prefer project/IDE path over repo path
       const displayPath = installations[0]?.skillPath || localSkill.path;
 
+      // Version count: use package-derived count when full package is loaded,
+      // otherwise use the count from Rust scan (localSkill.versionCount)
+      const versionCount = hasFullPackage
+        ? versions.filter((v) => v.isActive).length
+        : (localSkill.versionCount || versions.filter((v) => v.isActive).length);
+
       return {
         id: localSkill.id,
         name: localSkill.name,
@@ -108,7 +116,7 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
         source: localSkill.source,
         path: localSkill.path,
         status,
-        versionCount: versions.filter((v) => v.isActive).length || localSkill.versionCount,
+        versionCount,
         defaultVersion: versions.find((v) => v.isDefault) || versions[0] || null,
         versions,
         installations,
@@ -139,7 +147,13 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
 
     for (const ideSkill of ideSkills.value) {
       const ideSkillDirName = ideSkill.path.split("/").pop()?.toLowerCase() || "";
-      if (ideSkill.managed || managedNames.has(ideSkill.name.toLowerCase()) || managedNames.has(ideSkillDirName) || ideSkill.scope === "plugin") {
+
+      // Skip plugin skills — they are read-only and always coexist with repo skills
+      if (ideSkill.scope === "plugin") {
+        continue;
+      }
+
+      if (ideSkill.managed || managedNames.has(ideSkill.name.toLowerCase()) || managedNames.has(ideSkillDirName)) {
         continue;
       }
       const scope = ideSkill.scope as "global" | "project";
@@ -252,7 +266,8 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
 
   function buildVersionSummaries(localSkill: LocalSkill): LibraryVersionSummary[] {
     // If we have currentSkillPackage loaded and it matches this skill, use it
-    if (currentSkillPackage.value && currentSkillPackage.value.id === localSkill.id) {
+    const skillId = localSkill.currentVersion?.skillId || localSkill.id;
+    if (currentSkillPackage.value && currentSkillPackage.value.id === skillId) {
       return currentSkillPackage.value.versions.map((version): LibraryVersionSummary => ({
         id: version.id,
         version: version.version,
@@ -305,14 +320,15 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
       return "modified";
     }
 
-    // Check for conflicts: unmanaged copies with same name
-    const unmanagedCopies = relatedIdeSkills.filter((s) => !s.managed);
+    // Check for conflicts: unmanaged copies with same name (exclude plugin-scope — read-only, not a real conflict)
+    const unmanagedCopies = relatedIdeSkills.filter((s) => !s.managed && s.scope !== "plugin");
     if (unmanagedCopies.length > 0) {
       return "conflict";
     }
 
     // Check for outdated: compare version info from skill package
-    if (currentSkillPackage.value && currentSkillPackage.value.id === localSkill.id) {
+    const statusSkillId = localSkill.currentVersion?.skillId || localSkill.id;
+    if (currentSkillPackage.value && currentSkillPackage.value.id === statusSkillId) {
       const pkg = currentSkillPackage.value;
       const defaultVersion = pkg.versions.find((v) => v.id === pkg.defaultVersion);
       if (defaultVersion && localSkill.currentVersion) {

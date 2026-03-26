@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="q" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00d2ff"/>
+      <stop offset="50%" stop-color="#0091ff"/>
+      <stop offset="100%" stop-color="#4a6cf7"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00d2ff"/>
+      <stop offset="100%" stop-color="#4a6cf7"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded square -->
+  <rect width="1024" height="1024" rx="220" fill="url(#bg)"/>
+  <!-- Subtle inner glow -->
+  <rect x="40" y="40" width="944" height="944" rx="190" fill="none" stroke="url(#accent)" stroke-width="2" opacity="0.15"/>
+  <!-- Q letter - circle part -->
+  <circle cx="480" cy="460" r="240" fill="none" stroke="url(#q)" stroke-width="72" stroke-linecap="round"/>
+  <!-- Q letter - tail/slash extending out -->
+  <line x1="600" y1="580" x2="760" y2="740" stroke="url(#q)" stroke-width="72" stroke-linecap="round"/>
+  <!-- Small decorative dot -->
+  <circle cx="780" cy="760" r="20" fill="#00d2ff" opacity="0.6"/>
+</svg>

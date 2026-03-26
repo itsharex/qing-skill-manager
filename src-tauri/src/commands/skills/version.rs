@@ -1,6 +1,6 @@
 use super::{
     build_skill_diff, build_skill_version, collect_skills_from_dir,
-    package_from_skill_dir, read_package_state,
+    package_from_skill_dir, read_package_state, read_version_sidecar,
     write_package_state, write_version_metadata, write_version_sidecar,
     StoredVersionMetadata, VERSION_METADATA_FILE,
 };
@@ -45,10 +45,18 @@ pub fn create_skill_version(request: CreateVersionRequest) -> Result<CreateVersi
         sanitize_dir_name(&package.name),
         sanitize_dir_name(&request.display_name)
     );
-    let destination_path = manager_dir.join(destination_dir_name);
+    let destination_path = manager_dir.join(&destination_dir_name);
 
     if destination_path.exists() {
-        return Err("A version with the same destination folder already exists".to_string());
+        // If the existing directory is a soft-deleted version, remove it to allow reuse
+        let existing_sidecar = read_version_sidecar(&destination_path);
+        if existing_sidecar.deleted == Some(true) {
+            fs::remove_dir_all(&destination_path).map_err(|err| {
+                format!("Failed to remove soft-deleted version directory: {err}")
+            })?;
+        } else {
+            return Err("A version with the same destination folder already exists".to_string());
+        }
     }
 
     copy_dir_recursive(&source_path, &destination_path).map_err(|err| err.to_string())?;

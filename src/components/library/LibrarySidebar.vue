@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { IdeOption, LocalSkill } from "../../composables/types";
 
 const { t } = useI18n();
+
+type SortKey = "name" | "versions" | "usage";
+const sortBy = ref<SortKey>("name");
+const collapsedGroups = ref<Set<string>>(new Set());
 
 const props = defineProps<{
   skills: LocalSkill[];
@@ -19,16 +23,24 @@ const props = defineProps<{
   projectUsageMap: Map<string, string[]>;
   skillStatusMap: Map<string, string>;
   skillScopeMap: Map<string, string>;
+  skillHasNewVersionsMap: Map<string, boolean>;
+  skillDefaultVersionMap: Map<string, { displayName: string; versionCount: number }>;
+  skillPluginCountMap: Map<string, number>;
+  skillPluginOnlyMap: Map<string, boolean>;
+  activeStatusTags: Set<string>;
+  statusTagCounts: { managed: number; unmanaged: number; pluginOnly: number };
 }>();
 
 const emit = defineEmits<{
   (e: "update:searchQuery", value: string): void;
   (e: "update:platformFilter", value: string): void;
   (e: "update:statusFilter", value: string): void;
+  (e: "toggleStatusTag", tag: string): void;
   (e: "select", skill: LocalSkill): void;
   (e: "toggleSelected", skillId: string, checked: boolean): void;
   (e: "toggleSelectAll", checked: boolean, filteredIds: string[]): void;
   (e: "installSelected"): void;
+  (e: "cloneSelected"): void;
   (e: "deleteSelected"): void;
   (e: "adoptSelected"): void;
   (e: "clearSelection"): void;
@@ -39,33 +51,83 @@ const emit = defineEmits<{
 
 const filteredSkills = computed<LocalSkill[]>(() => props.skills);
 
-const repoSkills = computed(() => filteredSkills.value.filter((s) => {
-  const scope = props.skillScopeMap.get(s.id);
-  return scope === "repo";
-}));
+function getSkillSortValue(skill: LocalSkill): [number, string] {
+  if (sortBy.value === "versions") {
+    const vc = props.skillDefaultVersionMap.get(skill.id)?.versionCount ?? skill.versionCount;
+    return [-vc, skill.name.toLowerCase()];
+  }
+  if (sortBy.value === "usage") {
+    const usage = skill.usedBy.length + (props.projectUsageMap.get(skill.id)?.length ?? 0);
+    return [-usage, skill.name.toLowerCase()];
+  }
+  return [0, skill.name.toLowerCase()];
+}
 
-const globalSkills = computed(() => filteredSkills.value.filter((s) => {
-  const scope = props.skillScopeMap.get(s.id);
-  return scope === "global";
-}));
+function sortSkills(skills: LocalSkill[]): LocalSkill[] {
+  return [...skills].sort((a, b) => {
+    const [av, an] = getSkillSortValue(a);
+    const [bv, bn] = getSkillSortValue(b);
+    if (av !== bv) return av - bv;
+    return an.localeCompare(bn);
+  });
+}
 
-const projectSkills = computed(() => filteredSkills.value.filter((s) => {
-  const scope = props.skillScopeMap.get(s.id);
-  return scope === "project";
-}));
+function getNamespace(skill: LocalSkill): string {
+  return skill.currentVersion?.metadata?.namespace || "default";
+}
+
+const repoSkills = computed(() => sortSkills(
+  filteredSkills.value.filter((s) => props.skillScopeMap.get(s.id) === "repo")
+));
+
+const repoNamespaceGroups = computed(() => {
+  const map = new Map<string, LocalSkill[]>();
+  for (const s of repoSkills.value) {
+    const ns = getNamespace(s);
+    const group = map.get(ns);
+    if (group) group.push(s);
+    else map.set(ns, [s]);
+  }
+  return [...map.entries()].sort((a, b) => {
+    if (a[0] === "default") return 1;
+    if (b[0] === "default") return -1;
+    return a[0].localeCompare(b[0]);
+  });
+});
+
+function toggleGroup(ns: string) {
+  const next = new Set(collapsedGroups.value);
+  if (next.has(ns)) next.delete(ns);
+  else next.add(ns);
+  collapsedGroups.value = next;
+}
+
+const globalSkills = computed(() => sortSkills(
+  filteredSkills.value.filter((s) => props.skillScopeMap.get(s.id) === "global")
+));
+
+const projectSkills = computed(() => sortSkills(
+  filteredSkills.value.filter((s) => props.skillScopeMap.get(s.id) === "project")
+));
 
 const allSelected = computed<boolean>(() => {
   return filteredSkills.value.length > 0
     && filteredSkills.value.every((skill) => props.selectedIds.includes(skill.id));
 });
 
-function getSkillStatus(skill: LocalSkill): { label: string; type: "used" | "unused" | "modified" | "unmanaged" } {
+function getSkillStatus(skill: LocalSkill): { label: string; type: "used" | "unused" | "modified" | "unmanaged" | "conflict" | "outdated" } {
   const status = props.skillStatusMap.get(skill.id);
   if (status === "unmanaged") {
     return { label: t("library.status.unmanaged"), type: "unmanaged" };
   }
   if (status === "modified") {
     return { label: t("library.status.modified"), type: "modified" };
+  }
+  if (status === "conflict") {
+    return { label: t("library.statusConflict"), type: "conflict" };
+  }
+  if (status === "outdated") {
+    return { label: t("library.statusOutdated"), type: "outdated" };
   }
 
   const projectIds = props.projectUsageMap.get(skill.id);
@@ -124,6 +186,7 @@ function handleToggleAll(checked: boolean): void {
       <div class="bulk-actions">
         <button v-if="selectedUnmanagedCount > 0" class="primary btn-sm" @click="$emit('adoptSelected')">{{ t("library.adoptSelectedCount", { count: selectedUnmanagedCount }) }}</button>
         <button class="primary btn-sm" @click="$emit('installSelected')">{{ t("local.installSelected", { count: selectedIds.length }) }}</button>
+        <button class="ghost btn-sm" @click="$emit('cloneSelected')">{{ t("library.detail.cloneToProject") }}</button>
         <button class="ghost danger btn-sm" @click="$emit('deleteSelected')">{{ t("local.deleteSelected", { count: selectedIds.length }) }}</button>
         <button class="ghost btn-sm" @click="$emit('clearSelection')">{{ t("common.cancel") }}</button>
       </div>
@@ -145,13 +208,25 @@ function handleToggleAll(checked: boolean): void {
       </label>
 
       <label class="filter-group">
-        <span class="filter-label">{{ t("library.statusFilter") }}</span>
-        <select class="filter-select" :value="statusFilter" @change="$emit('update:statusFilter', ($event.target as HTMLSelectElement).value)">
-          <option v-for="option in statusOptions" :key="option.id" :value="option.id">
-            {{ option.id === 'all' ? t('common.all') : t(`library.status.${option.id}`) }}
-          </option>
+        <span class="filter-label">{{ t("library.sortBy") }}</span>
+        <select class="filter-select" :value="sortBy" @change="sortBy = ($event.target as HTMLSelectElement).value as SortKey">
+          <option value="name">{{ t("library.sortName") }}</option>
+          <option value="versions">{{ t("library.sortVersions") }}</option>
+          <option value="usage">{{ t("library.sortUsage") }}</option>
         </select>
       </label>
+    </div>
+
+    <div class="status-tags">
+      <button class="status-tag" :class="{ active: activeStatusTags.has('managed') }" @click="$emit('toggleStatusTag', 'managed')">
+        {{ t("library.status.managed") }} <span class="tag-count">{{ statusTagCounts.managed }}</span>
+      </button>
+      <button class="status-tag" :class="{ active: activeStatusTags.has('unmanaged') }" @click="$emit('toggleStatusTag', 'unmanaged')">
+        {{ t("library.status.unmanaged") }} <span class="tag-count">{{ statusTagCounts.unmanaged }}</span>
+      </button>
+      <button class="status-tag" :class="{ active: activeStatusTags.has('pluginOnly') }" @click="$emit('toggleStatusTag', 'pluginOnly')">
+        {{ t("library.status.pluginOnly") }} <span class="tag-count">{{ statusTagCounts.pluginOnly }}</span>
+      </button>
     </div>
 
     <div class="skills-list">
@@ -170,28 +245,38 @@ function handleToggleAll(checked: boolean): void {
       </div>
 
       <template v-if="repoSkills.length > 0">
-        <div class="group-header">{{ t("library.groupRepo") }} <span class="group-count">{{ repoSkills.length }}</span></div>
-        <article v-for="skill in repoSkills" :key="skill.id" class="card skill-card" :class="{ active: selectedSkillId === skill.id, linked: getSkillStatus(skill).type === 'used' }">
-          <div class="skill-card-top">
-            <label class="checkbox card-select" @click.stop>
-              <input type="checkbox" :checked="selectedIds.includes(skill.id)" @change="$emit('toggleSelected', skill.id, ($event.target as HTMLInputElement).checked)" />
-            </label>
-            <span class="repo-indicator in-repo" :title="t('library.inRepo')">●</span>
-            <button class="skill-main" @click="$emit('select', skill)">
-              <div class="skill-item-header">
-                <span class="skill-name">{{ skill.name }}</span>
-                <span class="status-badge" :class="getSkillStatus(skill).type">{{ getSkillStatus(skill).label }}</span>
-              </div>
-              <div class="card-meta skill-description-line">{{ skill.description || skill.path }}</div>
-              <div class="skill-meta">
-                <span v-if="skill.currentVersion" class="version-chip">{{ skill.currentVersion.displayName }}</span>
-                <span class="version-meta-text">{{ t("version.totalVersions") }}: {{ skill.versionCount }}</span>
-                <span v-if="getLinkedIdeCount(skill) > 0" class="ide-count global">{{ t("library.globalIdes", { count: getLinkedIdeCount(skill) }) }}</span>
-                <span v-if="getProjectCount(skill) > 0" class="ide-count project">{{ t("library.projectUsage", { count: getProjectCount(skill) }) }}</span>
-              </div>
-            </button>
+        <template v-for="[ns, skills] in repoNamespaceGroups" :key="ns">
+          <div v-if="repoNamespaceGroups.length > 1" class="group-header ns-header" @click="toggleGroup(ns)">
+            <span class="collapse-icon">{{ collapsedGroups.has(ns) ? '▸' : '▾' }}</span>
+            <span class="ns-label">{{ ns === 'default' ? t("library.groupRepo") : ns }}</span>
+            <span class="group-count">{{ skills.length }}</span>
           </div>
-        </article>
+          <template v-if="!collapsedGroups.has(ns)">
+            <article v-for="skill in skills" :key="skill.id" class="card skill-card" :class="{ active: selectedSkillId === skill.id, linked: getSkillStatus(skill).type === 'used' }">
+              <div class="skill-card-top">
+                <label class="checkbox card-select" @click.stop>
+                  <input type="checkbox" :checked="selectedIds.includes(skill.id)" @change="$emit('toggleSelected', skill.id, ($event.target as HTMLInputElement).checked)" />
+                </label>
+                <span class="repo-indicator in-repo" :title="t('library.inRepo')">●</span>
+                <button class="skill-main" @click="$emit('select', skill)">
+                  <div class="skill-item-header">
+                    <span class="skill-name">{{ skill.name }}</span>
+                    <span v-if="skillPluginOnlyMap.get(skill.id)" class="status-badge plugin-only">{{ t("library.status.pluginOnly") }}</span>
+                  </div>
+                  <div class="card-meta skill-description-line">{{ skill.description || skill.path }}</div>
+                  <div class="skill-meta">
+                    <span v-if="skillDefaultVersionMap.get(skill.id)?.displayName || skill.currentVersion" class="version-chip">{{ skillDefaultVersionMap.get(skill.id)?.displayName || skill.currentVersion?.displayName }}</span>
+                    <span class="version-meta-text">{{ t("version.totalVersions") }}: {{ skillDefaultVersionMap.get(skill.id)?.versionCount ?? skill.versionCount }}</span>
+                    <span v-if="skillHasNewVersionsMap.get(skill.id)" class="new-version-badge">{{ t("library.versions.detected") }}</span>
+                    <span v-if="getLinkedIdeCount(skill) > 0" class="ide-count global">{{ t("library.globalIdes", { count: getLinkedIdeCount(skill) }) }}</span>
+                    <span v-if="getProjectCount(skill) > 0" class="ide-count project">{{ t("library.projectUsage", { count: getProjectCount(skill) }) }}</span>
+                    <span v-if="skillPluginCountMap.get(skill.id)" class="ide-count plugin">{{ t("library.pluginCount", { count: skillPluginCountMap.get(skill.id) }) }}</span>
+                  </div>
+                </button>
+              </div>
+            </article>
+          </template>
+        </template>
       </template>
 
       <template v-if="globalSkills.length > 0">
@@ -231,6 +316,7 @@ function handleToggleAll(checked: boolean): void {
           </div>
         </article>
       </template>
+
     </div>
   </aside>
 </template>
@@ -320,6 +406,42 @@ function handleToggleAll(checked: boolean): void {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-top: 12px;
+}
+
+.status-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-card-border);
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.status-tag:hover {
+  border-color: var(--color-input-focus);
+}
+
+.status-tag.active {
+  background: var(--color-primary-bg);
+  border-color: var(--color-primary-bg);
+  color: var(--color-primary-text);
+}
+
+.tag-count {
+  font-size: 11px;
+  opacity: 0.7;
 }
 
 .filter-group {
@@ -483,9 +605,29 @@ function handleToggleAll(checked: boolean): void {
   font-style: italic;
 }
 
+.status-badge.plugin-only {
+  background: var(--color-chip-bg);
+  border: 1px solid var(--color-chip-border);
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.status-badge.conflict {
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  color: var(--color-error-text);
+}
+
+.status-badge.outdated {
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  color: var(--color-warning-text);
+}
+
 .skill-card.unmanaged {
   opacity: 0.85;
 }
+
 
 .repo-indicator {
   flex-shrink: 0;
@@ -510,6 +652,33 @@ function handleToggleAll(checked: boolean): void {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.ns-header {
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+  padding: 6px 4px;
+  margin: 2px 0;
+}
+
+.ns-header:hover {
+  background: var(--color-card-bg);
+}
+
+.collapse-icon {
+  font-size: 10px;
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.ns-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .group-count {
@@ -542,5 +711,16 @@ function handleToggleAll(checked: boolean): void {
 .ide-count {
   color: var(--color-muted);
   font-size: 12px;
+}
+
+.new-version-badge {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  color: var(--color-warning-text);
+  white-space: nowrap;
 }
 </style>

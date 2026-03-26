@@ -121,20 +121,61 @@ pub fn scan_overview(request: LocalScanRequest) -> Result<Overview, String> {
 
     // Build version hash map: content_hash → (version_id, skill_id)
     // This enables matching IDE skills to specific versions
+    // Also update version_count from loaded packages (collect_skills_from_dir only sets 0 or 1)
     let mut version_hash_map = std::collections::HashMap::new();
-    for skill in &manager_skills {
-        if let Some(version) = &skill.current_version {
-            version_hash_map.entry(version.content_hash.clone())
-                .or_insert((version.id.clone(), version.skill_id.clone()));
-            // Also load full package to match against all versions
-            if let Ok(pkg) = super::version::get_skill_package(
-                crate::types::GetSkillPackageRequest { skill_id: version.skill_id.clone() }
-            ) {
-                for v in &pkg.package.versions {
-                    version_hash_map.entry(v.content_hash.clone())
-                        .or_insert((v.id.clone(), v.skill_id.clone()));
+    for i in 0..manager_skills.len() {
+        let (skill_id, content_hash) = match &manager_skills[i].current_version {
+            Some(v) => (v.skill_id.clone(), v.content_hash.clone()),
+            None => continue,
+        };
+        version_hash_map.entry(content_hash.clone())
+            .or_insert_with(|| {
+                let v = manager_skills[i].current_version.as_ref().unwrap();
+                (v.id.clone(), v.skill_id.clone())
+            });
+        // Load full package to match against all versions, get real version count,
+        // and update current_version to the default version from the package
+        if let Ok(pkg) = super::version::get_skill_package(
+            crate::types::GetSkillPackageRequest { skill_id }
+        ) {
+            let active_count = pkg.package.versions.iter().filter(|v| v.is_active).count();
+            manager_skills[i].version_count = active_count;
+            // Use the default version's info so the sidebar shows the correct default name
+            if let Some(default_ver) = pkg.package.versions.iter()
+                .find(|v| v.id == pkg.package.default_version && v.is_active)
+            {
+                manager_skills[i].current_version = Some(default_ver.clone());
+            }
+            for v in &pkg.package.versions {
+                version_hash_map.entry(v.content_hash.clone())
+                    .or_insert((v.id.clone(), v.skill_id.clone()));
+            }
+        }
+    }
+
+    // Deduplicate manager skills by skill_id — keep one entry per unique skill
+    // (multiple version directories for the same skill should appear as one sidebar item)
+    {
+        let mut seen_skill_ids = std::collections::HashSet::new();
+        let mut deduped = Vec::new();
+        for skill in manager_skills {
+            let skill_id = skill.current_version.as_ref().map(|v| v.skill_id.clone());
+            if let Some(ref sid) = skill_id {
+                if !seen_skill_ids.insert(sid.clone()) {
+                    continue; // skip duplicate — we already kept the first (with updated default version)
                 }
             }
+            deduped.push(skill);
+        }
+        manager_skills = deduped;
+    }
+
+    // Rebuild manager_map after dedup (indices changed)
+    manager_map.clear();
+    for (idx, skill) in manager_skills.iter().enumerate() {
+        let path = Path::new(&skill.path);
+        if path.join("SKILL.md").exists() {
+            manager_map.push((skill_content_hash(path), idx));
         }
     }
 
@@ -270,7 +311,8 @@ pub fn import_local_skill(request: ImportRequest) -> Result<String, String> {
     let target_dir = manager_dir.join(&safe_name);
 
     if target_dir.exists() {
-        return Err(format!("Target skill already exists: {}", safe_name));
+        // Already managed — not an error during adopt
+        return Ok(format!("Skill already managed: {}", name));
     }
 
     fs::create_dir_all(&target_dir).map_err(|err| err.to_string())?;

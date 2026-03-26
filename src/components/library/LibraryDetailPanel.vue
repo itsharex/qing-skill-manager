@@ -44,6 +44,10 @@ const globalInstallations = computed(() => {
     }));
 });
 
+const pluginInstallations = computed(() =>
+  (props.librarySkill?.installations || []).filter((i) => i.scope === "plugin")
+);
+
 const projectInstallations = computed(() =>
   (props.librarySkill?.unmanagedSources || [])
     .filter((s) => s.scope === "project")
@@ -168,6 +172,9 @@ function getMappingDescription(status: string): string {
           <button class="primary" :disabled="isInstalling" @click="$emit('install', skill)">
             {{ isInstalling ? t("library.detail.installing") : t("library.detail.installToIde") }}
           </button>
+          <button v-if="cloneProjects.some((p) => !p.mapped)" class="ghost" @click="$emit('cloneToProject', cloneProjects.find((p) => !p.mapped)!.id)">
+            {{ t("library.detail.cloneToProject") }}
+          </button>
         </div>
       </section>
 
@@ -263,6 +270,24 @@ function getMappingDescription(status: string): string {
             </div>
           </div>
         </template>
+      </section>
+
+      <section v-if="pluginInstallations.length > 0" class="panel section-panel">
+        <div class="section-title-row">
+          <div class="panel-title section-title-text">{{ t("library.pluginDeployments") }}</div>
+          <div class="hint">{{ pluginInstallations.length }} {{ t("library.versions.locations") }}</div>
+        </div>
+        <div class="install-list">
+          <div v-for="inst in pluginInstallations" :key="inst.skillPath" class="install-entry">
+            <div class="install-info">
+              <span class="install-ide">{{ inst.ideLabel }}</span>
+              <span class="mapping-badge muted">{{ t("ide.sourcePlugin") }}</span>
+            </div>
+            <div class="install-actions">
+              <button class="ghost btn-xs" @click="$emit('openDir', inst.skillPath)">{{ t("ide.openDir") }}</button>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
   </main>

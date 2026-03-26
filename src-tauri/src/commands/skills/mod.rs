@@ -711,10 +711,9 @@ pub(crate) fn resolve_default_version(
 mod tests {
     use super::*;
     use crate::types::{
-        AdoptIdeSkillRequest, AppConfig, ConflictSeverity, ConflictType, IdeDir, InstallRequest,
-        LinkTarget, LocalScanRequest, ProjectSkillImportStatus, ResolutionAction,
-        SaveAppConfigRequest, ScanProjectSkillsRequest, SkillVersion, SkillVersionMetadata,
-        SkillVersionSource, UninstallRequest,
+        AdoptIdeSkillRequest, AppConfig, IdeDir, InstallRequest, LocalScanRequest,
+        SaveAppConfigRequest, SkillVersion, SkillVersionMetadata, SkillVersionSource,
+        UninstallRequest,
     };
     use crate::utils::download::copy_dir_recursive;
     use std::fs;
@@ -1166,7 +1165,7 @@ mod tests {
 
     #[test]
     fn scan_project_opencode_skills_marks_matching_managed_version() {
-        use crate::types::{CompareVersionsRequest, ScanProjectSkillsRequest};
+        use crate::types::ScanProjectSkillsRequest;
         let home = dirs::home_dir().expect("home dir");
         let unique = unique_test_name("project-scan-match");
         let manager_root = home.join(".qing-skill-manager/skills");
@@ -1308,5 +1307,626 @@ mod tests {
         let _ = fs::remove_dir_all(second_manager_dir);
         let _ = fs::remove_file(package_state_path(&home, &first_version.skill_id));
         let _ = fs::remove_dir_all(home.join(".skills-manager-test").join(unique));
+    }
+
+    // ========================================================================
+    // P1: Sidecar read/write + round-trip + error resilience
+    // ========================================================================
+
+    #[test]
+    fn install_sidecar_returns_default_when_missing() {
+        let temp = std::env::temp_dir().join(unique_test_name("sidecar-missing"));
+        fs::create_dir_all(&temp).expect("create dir");
+
+        let sidecar = read_install_sidecar(&temp);
+        assert!(sidecar.version_id.is_none());
+        assert!(sidecar.content_hash.is_none());
+        assert!(sidecar.installed_at.is_none());
+        assert!(sidecar.source_skill_id.is_none());
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn install_sidecar_write_then_read_round_trip() {
+        let temp = std::env::temp_dir().join(unique_test_name("sidecar-roundtrip"));
+        fs::create_dir_all(&temp).expect("create dir");
+
+        let original = InstalledSkillSidecar {
+            version_id: Some("1-0-0_abc12345".to_string()),
+            content_hash: Some("abc1234567890def".to_string()),
+            installed_at: Some(1700000000),
+            source_skill_id: Some("my-skill_default".to_string()),
+        };
+        write_install_sidecar(&temp, &original).expect("write sidecar");
+
+        let loaded = read_install_sidecar(&temp);
+        assert_eq!(loaded.version_id, original.version_id);
+        assert_eq!(loaded.content_hash, original.content_hash);
+        assert_eq!(loaded.installed_at, original.installed_at);
+        assert_eq!(loaded.source_skill_id, original.source_skill_id);
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn install_sidecar_returns_default_on_corrupt_json() {
+        let temp = std::env::temp_dir().join(unique_test_name("sidecar-corrupt"));
+        fs::create_dir_all(&temp).expect("create dir");
+        fs::write(temp.join(INSTALL_SIDECAR_FILE), "not valid json {{{").expect("write corrupt");
+
+        let sidecar = read_install_sidecar(&temp);
+        assert!(sidecar.version_id.is_none());
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    // ========================================================================
+    // P1: Version sidecar read/write
+    // ========================================================================
+
+    #[test]
+    fn version_sidecar_returns_default_when_missing() {
+        let temp = std::env::temp_dir().join(unique_test_name("vsidecar-missing"));
+        fs::create_dir_all(&temp).expect("create dir");
+
+        let sidecar = read_version_sidecar(&temp);
+        assert!(sidecar.version.is_none());
+        assert!(sidecar.display_name.is_none());
+        assert!(sidecar.deleted.is_none());
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn version_sidecar_write_then_read_round_trip() {
+        let temp = std::env::temp_dir().join(unique_test_name("vsidecar-roundtrip"));
+        fs::create_dir_all(&temp).expect("create dir");
+
+        let original = StoredVersionMetadata {
+            version: Some("2.0.0".to_string()),
+            display_name: Some("Release 2".to_string()),
+            source_url: Some("https://example.com".to_string()),
+            parent_version: Some("1.0.0".to_string()),
+            deleted: Some(false),
+        };
+        write_version_sidecar(&temp, &original).expect("write version sidecar");
+
+        let loaded = read_version_sidecar(&temp);
+        assert_eq!(loaded.version, original.version);
+        assert_eq!(loaded.display_name, original.display_name);
+        assert_eq!(loaded.source_url, original.source_url);
+        assert_eq!(loaded.parent_version, original.parent_version);
+        assert_eq!(loaded.deleted, original.deleted);
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn version_sidecar_returns_default_on_corrupt_json() {
+        let temp = std::env::temp_dir().join(unique_test_name("vsidecar-corrupt"));
+        fs::create_dir_all(&temp).expect("create dir");
+        fs::write(temp.join(VERSION_METADATA_FILE), "garbage").expect("write corrupt");
+
+        let sidecar = read_version_sidecar(&temp);
+        assert!(sidecar.version.is_none());
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    // ========================================================================
+    // P1: skill_content_hash stability
+    // ========================================================================
+
+    #[test]
+    fn skill_content_hash_is_deterministic() {
+        let temp = std::env::temp_dir().join(unique_test_name("hash-deterministic"));
+        fs::create_dir_all(&temp).expect("create dir");
+        fs::write(temp.join("SKILL.md"), "---\nname: Test\n---\nBody\n").expect("write");
+
+        let hash1 = skill_content_hash(&temp);
+        let hash2 = skill_content_hash(&temp);
+        assert_eq!(hash1, hash2);
+        assert_eq!(hash1.len(), 16); // FNV-1a 64-bit → 16 hex chars
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn skill_content_hash_differs_for_different_content() {
+        let temp_a = std::env::temp_dir().join(unique_test_name("hash-diff-a"));
+        let temp_b = std::env::temp_dir().join(unique_test_name("hash-diff-b"));
+        fs::create_dir_all(&temp_a).expect("create dir a");
+        fs::create_dir_all(&temp_b).expect("create dir b");
+        fs::write(temp_a.join("SKILL.md"), "Content A").expect("write a");
+        fs::write(temp_b.join("SKILL.md"), "Content B").expect("write b");
+
+        assert_ne!(skill_content_hash(&temp_a), skill_content_hash(&temp_b));
+
+        let _ = fs::remove_dir_all(temp_a);
+        let _ = fs::remove_dir_all(temp_b);
+    }
+
+    #[test]
+    fn skill_content_hash_returns_empty_string_hash_when_no_skill_file() {
+        let temp = std::env::temp_dir().join(unique_test_name("hash-no-file"));
+        fs::create_dir_all(&temp).expect("create dir");
+
+        let hash = skill_content_hash(&temp);
+        // Hash of empty string — should still be consistent
+        assert_eq!(hash, simple_hash(""));
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    // ========================================================================
+    // P1: Sync status detection in collect_ide_skills
+    // ========================================================================
+
+    #[test]
+    fn collect_ide_skills_synced_with_sidecar() {
+        let home = dirs::home_dir().expect("home dir");
+        let unique = unique_test_name("sync-synced");
+        let root = home.join(".skills-manager-test").join(&unique);
+        let manager_root = home.join(".qing-skill-manager/skills");
+        let ide_root = root.join("ide");
+
+        fs::create_dir_all(&manager_root).expect("create manager root");
+        fs::create_dir_all(&ide_root).expect("create ide root");
+
+        let skill_content = "---\nname: Sync Test\nversion: 1.0.0\n---\nSynced body\n";
+        let manager_dir = write_skill_dir(&manager_root, &format!("sync-test-{}", unique), skill_content);
+        let ide_dir = write_skill_dir(&ide_root, "sync-test-skill", skill_content);
+
+        // Write sidecar matching current content
+        let hash = skill_content_hash(&ide_dir);
+        write_install_sidecar(&ide_dir, &InstalledSkillSidecar {
+            version_id: Some("v1".to_string()),
+            content_hash: Some(hash.clone()),
+            installed_at: Some(1700000000),
+            source_skill_id: None,
+        }).expect("write sidecar");
+
+        let manager_hash = skill_content_hash(&manager_dir);
+        let mut manager_skills = vec![LocalSkill {
+            id: manager_dir.display().to_string(),
+            name: "Sync Test".to_string(),
+            description: "".to_string(),
+            path: manager_dir.display().to_string(),
+            source: "manager".to_string(),
+            ide: None,
+            used_by: Vec::new(),
+            version_count: 1,
+            current_version: None,
+        }];
+        let manager_map = vec![(manager_hash, 0usize)];
+        let version_hash_map = std::collections::HashMap::new();
+
+        let ide_skills = collect_ide_skills(
+            &ide_root, "TestIDE", "global", &manager_map, &mut manager_skills, &version_hash_map,
+        );
+
+        let skill = ide_skills.iter().find(|s| s.name == "Sync Test").expect("found");
+        assert_eq!(skill.sync_status, "synced");
+        assert_eq!(skill.version_id.as_deref(), Some("v1"));
+        assert!(skill.managed);
+
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(manager_dir);
+    }
+
+    #[test]
+    fn collect_ide_skills_modified_when_content_changed() {
+        let home = dirs::home_dir().expect("home dir");
+        let unique = unique_test_name("sync-modified");
+        let root = home.join(".skills-manager-test").join(&unique);
+        let ide_root = root.join("ide");
+
+        fs::create_dir_all(&ide_root).expect("create ide root");
+
+        // Write skill with content different from what sidecar recorded
+        let ide_dir = write_skill_dir(&ide_root, "mod-skill", "---\nname: Mod Test\n---\nModified body\n");
+        write_install_sidecar(&ide_dir, &InstalledSkillSidecar {
+            version_id: Some("v1".to_string()),
+            content_hash: Some("old_hash_not_matching".to_string()),
+            installed_at: Some(1700000000),
+            source_skill_id: None,
+        }).expect("write sidecar");
+
+        let manager_map: Vec<(String, usize)> = vec![];
+        let mut manager_skills: Vec<LocalSkill> = vec![];
+        let version_hash_map = std::collections::HashMap::new();
+
+        let ide_skills = collect_ide_skills(
+            &ide_root, "TestIDE", "global", &manager_map, &mut manager_skills, &version_hash_map,
+        );
+
+        let skill = ide_skills.iter().find(|s| s.name == "Mod Test").expect("found");
+        assert_eq!(skill.sync_status, "modified");
+        assert!(skill.managed); // modified means it was installed by us
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn collect_ide_skills_untracked_when_no_sidecar_but_managed() {
+        let home = dirs::home_dir().expect("home dir");
+        let unique = unique_test_name("sync-untracked");
+        let root = home.join(".skills-manager-test").join(&unique);
+        let manager_root = home.join(".qing-skill-manager/skills");
+        let ide_root = root.join("ide");
+
+        fs::create_dir_all(&manager_root).expect("create manager root");
+        fs::create_dir_all(&ide_root).expect("create ide root");
+
+        let content = "---\nname: Untracked Test\n---\nLegacy install body\n";
+        let manager_dir = write_skill_dir(&manager_root, &format!("untracked-{}", unique), content);
+        // Same content in IDE but NO sidecar
+        write_skill_dir(&ide_root, "untracked-skill", content);
+
+        let manager_hash = skill_content_hash(&manager_dir);
+        let mut manager_skills = vec![LocalSkill {
+            id: manager_dir.display().to_string(),
+            name: "Untracked Test".to_string(),
+            description: "".to_string(),
+            path: manager_dir.display().to_string(),
+            source: "manager".to_string(),
+            ide: None,
+            used_by: Vec::new(),
+            version_count: 1,
+            current_version: None,
+        }];
+        let manager_map = vec![(manager_hash, 0usize)];
+        let version_hash_map = std::collections::HashMap::new();
+
+        let ide_skills = collect_ide_skills(
+            &ide_root, "TestIDE", "global", &manager_map, &mut manager_skills, &version_hash_map,
+        );
+
+        let skill = ide_skills.iter().find(|s| s.name == "Untracked Test").expect("found");
+        assert_eq!(skill.sync_status, "untracked");
+        assert!(skill.managed);
+
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(manager_dir);
+    }
+
+    #[test]
+    fn collect_ide_skills_unknown_when_fully_unmanaged() {
+        let home = dirs::home_dir().expect("home dir");
+        let unique = unique_test_name("sync-unknown");
+        let root = home.join(".skills-manager-test").join(&unique);
+        let ide_root = root.join("ide");
+
+        fs::create_dir_all(&ide_root).expect("create ide root");
+
+        write_skill_dir(&ide_root, "unknown-skill", "---\nname: Unknown Test\n---\nRandom body\n");
+
+        let manager_map: Vec<(String, usize)> = vec![];
+        let mut manager_skills: Vec<LocalSkill> = vec![];
+        let version_hash_map = std::collections::HashMap::new();
+
+        let ide_skills = collect_ide_skills(
+            &ide_root, "TestIDE", "global", &manager_map, &mut manager_skills, &version_hash_map,
+        );
+
+        let skill = ide_skills.iter().find(|s| s.name == "Unknown Test").expect("found");
+        assert_eq!(skill.sync_status, "unknown");
+        assert!(!skill.managed);
+        assert_eq!(skill.source, "local");
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    // ========================================================================
+    // P1: Version hash map matching (unmanaged → managed via hash map)
+    // ========================================================================
+
+    #[test]
+    fn collect_ide_skills_matches_via_version_hash_map() {
+        let home = dirs::home_dir().expect("home dir");
+        let unique = unique_test_name("sync-hashmap");
+        let root = home.join(".skills-manager-test").join(&unique);
+        let ide_root = root.join("ide");
+
+        fs::create_dir_all(&ide_root).expect("create ide root");
+
+        let content = "---\nname: HashMap Test\n---\nHashmap body\n";
+        let ide_dir = write_skill_dir(&ide_root, "hashmap-skill", content);
+        let hash = skill_content_hash(&ide_dir);
+
+        let manager_map: Vec<(String, usize)> = vec![];
+        let mut manager_skills: Vec<LocalSkill> = vec![];
+        let mut version_hash_map = std::collections::HashMap::new();
+        version_hash_map.insert(hash, ("v2_abc".to_string(), "hashmap-test_default".to_string()));
+
+        let ide_skills = collect_ide_skills(
+            &ide_root, "TestIDE", "global", &manager_map, &mut manager_skills, &version_hash_map,
+        );
+
+        let skill = ide_skills.iter().find(|s| s.name == "HashMap Test").expect("found");
+        assert!(skill.managed);
+        assert_eq!(skill.sync_status, "untracked");
+        assert_eq!(skill.version_id.as_deref(), Some("v2_abc"));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    // ========================================================================
+    // P2: build_skill_version
+    // ========================================================================
+
+    #[test]
+    fn build_skill_version_basic() {
+        let temp = std::env::temp_dir().join(unique_test_name("bsv-basic"));
+        fs::create_dir_all(&temp).expect("create dir");
+        fs::write(temp.join("SKILL.md"), "---\nname: MySkill\nversion: 1.2.3\nauthor: Me\nnamespace: team\n---\nDesc\n").expect("write");
+
+        let version = build_skill_version(&temp, SkillVersionSource::Clone);
+        assert_eq!(version.version, "1.2.3");
+        assert_eq!(version.metadata.name, "MySkill");
+        assert_eq!(version.metadata.author.as_deref(), Some("Me"));
+        assert_eq!(version.metadata.namespace.as_deref(), Some("team"));
+        assert_eq!(version.source, SkillVersionSource::Clone);
+        assert!(version.is_active);
+        assert!(!version.content_hash.is_empty());
+        assert!(version.id.starts_with("1-2-3_"));
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn build_skill_version_uses_sidecar_version_over_metadata() {
+        let temp = std::env::temp_dir().join(unique_test_name("bsv-sidecar-override"));
+        fs::create_dir_all(&temp).expect("create dir");
+        fs::write(temp.join("SKILL.md"), "---\nname: Test\nversion: 1.0.0\n---\nBody\n").expect("write");
+        write_version_sidecar(&temp, &StoredVersionMetadata {
+            version: Some("3.0.0".to_string()),
+            display_name: Some("Custom Name".to_string()),
+            ..Default::default()
+        }).expect("write sidecar");
+
+        let version = build_skill_version(&temp, SkillVersionSource::Migration);
+        assert_eq!(version.version, "3.0.0");
+        assert_eq!(version.display_name, "Custom Name");
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn build_skill_version_defaults_version_to_1_0_0() {
+        let temp = std::env::temp_dir().join(unique_test_name("bsv-default-version"));
+        fs::create_dir_all(&temp).expect("create dir");
+        // No version in frontmatter, no sidecar
+        fs::write(temp.join("SKILL.md"), "---\nname: NoVer\n---\nBody\n").expect("write");
+
+        let version = build_skill_version(&temp, SkillVersionSource::Migration);
+        assert_eq!(version.version, "1.0.0");
+        assert_eq!(version.display_name, "1.0.0");
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    // ========================================================================
+    // P2: Soft-delete (is_active)
+    // ========================================================================
+
+    #[test]
+    fn build_skill_version_respects_soft_delete_flag() {
+        let temp = std::env::temp_dir().join(unique_test_name("bsv-deleted"));
+        fs::create_dir_all(&temp).expect("create dir");
+        fs::write(temp.join("SKILL.md"), "---\nname: Deleted\nversion: 1.0.0\n---\nBody\n").expect("write");
+        write_version_sidecar(&temp, &StoredVersionMetadata {
+            deleted: Some(true),
+            ..Default::default()
+        }).expect("write sidecar");
+
+        let version = build_skill_version(&temp, SkillVersionSource::Migration);
+        assert!(!version.is_active);
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn build_skill_version_is_active_when_deleted_false() {
+        let temp = std::env::temp_dir().join(unique_test_name("bsv-not-deleted"));
+        fs::create_dir_all(&temp).expect("create dir");
+        fs::write(temp.join("SKILL.md"), "---\nname: Active\nversion: 1.0.0\n---\nBody\n").expect("write");
+        write_version_sidecar(&temp, &StoredVersionMetadata {
+            deleted: Some(false),
+            ..Default::default()
+        }).expect("write sidecar");
+
+        let version = build_skill_version(&temp, SkillVersionSource::Migration);
+        assert!(version.is_active);
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn build_skill_version_is_active_when_deleted_absent() {
+        let temp = std::env::temp_dir().join(unique_test_name("bsv-no-deleted"));
+        fs::create_dir_all(&temp).expect("create dir");
+        fs::write(temp.join("SKILL.md"), "---\nname: NoFlag\nversion: 2.0.0\n---\nBody\n").expect("write");
+
+        let version = build_skill_version(&temp, SkillVersionSource::Migration);
+        assert!(version.is_active);
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    // ========================================================================
+    // P2: build_skill_id
+    // ========================================================================
+
+    #[test]
+    fn build_skill_id_with_namespace() {
+        let id = build_skill_id("My Skill", Some("team-a"));
+        assert_eq!(id, "my-skill_team-a");
+    }
+
+    #[test]
+    fn build_skill_id_defaults_namespace() {
+        let id = build_skill_id("My Skill", None);
+        assert_eq!(id, "my-skill_default");
+    }
+
+    #[test]
+    fn build_skill_id_empty_namespace_uses_default() {
+        // sanitize_dir_name("") → "skill" (non-empty), so filter doesn't trigger
+        // Only None triggers the default
+        let id_none = build_skill_id("Test", None);
+        assert_eq!(id_none, "test_default");
+        // Empty string gets sanitized to "skill"
+        let id_empty = build_skill_id("Test", Some(""));
+        assert_eq!(id_empty, "test_skill");
+    }
+
+    // ========================================================================
+    // P2: clone_local_skill writes sidecar
+    // ========================================================================
+
+    #[test]
+    fn clone_local_skill_writes_install_sidecar() {
+        use crate::types::LinkTarget;
+        let home = dirs::home_dir().expect("home dir");
+        let unique = unique_test_name("clone-sidecar");
+        let root = home.join(".skills-manager-test").join(&unique);
+        let manager_root = home.join(".qing-skill-manager/skills");
+        let target_root = root.join("ide");
+        fs::create_dir_all(&manager_root).expect("create manager root");
+        fs::create_dir_all(&target_root).expect("create target root");
+
+        let skill_dir = write_skill_dir(
+            &manager_root,
+            &format!("sidecar-test-{}", unique),
+            "---\nname: Sidecar Write\nversion: 1.0.0\n---\nBody\n",
+        );
+
+        let result = scan::clone_local_skill(InstallRequest {
+            skill_path: skill_dir.display().to_string(),
+            skill_name: "Sidecar Write".to_string(),
+            install_targets: vec![LinkTarget {
+                name: "Test IDE".to_string(),
+                path: target_root.display().to_string(),
+            }],
+        }).expect("clone succeeds");
+
+        assert!(!result.installed.is_empty());
+
+        let cloned_dir = target_root.join("sidecar-write");
+        let sidecar = read_install_sidecar(&cloned_dir);
+        assert!(sidecar.version_id.is_some());
+        assert!(sidecar.content_hash.is_some());
+        assert!(sidecar.installed_at.is_some());
+        assert!(sidecar.source_skill_id.is_some());
+
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_dir_all(&skill_dir);
+    }
+
+    // ========================================================================
+    // P3: collect_plugin_skills
+    // ========================================================================
+
+    #[test]
+    fn collect_plugin_skills_finds_nested_skills() {
+        let temp = std::env::temp_dir().join(unique_test_name("plugins"));
+        let plugin_dir = temp.join("my-plugin/skills/my-plugin-skill");
+        fs::create_dir_all(&plugin_dir).expect("create plugin skill dir");
+        fs::write(plugin_dir.join("SKILL.md"), "---\nname: Plugin Skill\n---\nPlugin body\n").expect("write");
+
+        let skills = collect_plugin_skills(&temp, "Claude Code");
+
+        assert_eq!(skills.len(), 1);
+        assert_eq!(skills[0].name, "Plugin Skill");
+        assert_eq!(skills[0].source, "plugin");
+        assert_eq!(skills[0].scope, "plugin");
+        assert!(!skills[0].managed);
+        assert_eq!(skills[0].sync_status, "unknown");
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn collect_plugin_skills_returns_empty_for_missing_dir() {
+        let temp = std::env::temp_dir().join(unique_test_name("plugins-missing"));
+        let skills = collect_plugin_skills(&temp, "Claude Code");
+        assert!(skills.is_empty());
+    }
+
+    #[test]
+    fn collect_plugin_skills_skips_dirs_without_skill_md() {
+        let temp = std::env::temp_dir().join(unique_test_name("plugins-no-skill"));
+        let not_a_skill = temp.join("plugin/skills/not-a-skill");
+        fs::create_dir_all(&not_a_skill).expect("create dir");
+        // No SKILL.md
+
+        let skills = collect_plugin_skills(&temp, "Claude Code");
+        assert!(skills.is_empty());
+
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    // ========================================================================
+    // P3: scan_project_skills dedup across multiple IDE dirs
+    // ========================================================================
+
+    #[test]
+    fn scan_project_skills_deduplicates_across_ide_dirs() {
+        use crate::types::ScanProjectSkillsRequest;
+        let home = dirs::home_dir().expect("home dir");
+        let unique = unique_test_name("project-dedup");
+        let project_root = home.join(".skills-manager-test").join(&unique).join("project");
+        let manager_root = home.join(".qing-skill-manager/skills");
+
+        // Same skill in two IDE directories
+        let claude_dir = project_root.join(".claude/skills");
+        let opencode_dir = project_root.join(".opencode/skills");
+        fs::create_dir_all(&claude_dir).expect("create claude dir");
+        fs::create_dir_all(&opencode_dir).expect("create opencode dir");
+        fs::create_dir_all(&manager_root).expect("create manager root");
+
+        let content = "---\nname: Dedup Test\nversion: 1.0.0\n---\nBody\n";
+        write_skill_dir(&claude_dir, "dedup-test", content);
+        write_skill_dir(&opencode_dir, "dedup-test", content);
+
+        let result = scan::scan_project_skills(ScanProjectSkillsRequest {
+            project_dir: project_root.display().to_string(),
+            manager_root: manager_root.display().to_string(),
+        }).expect("scan succeeds");
+
+        // Should only find 1 skill, not 2
+        assert_eq!(result.skills.len(), 1);
+        assert_eq!(result.skills[0].name, "Dedup Test");
+
+        let _ = fs::remove_dir_all(home.join(".skills-manager-test").join(unique));
+    }
+
+    // ========================================================================
+    // P3: build_skill_diff
+    // ========================================================================
+
+    #[test]
+    fn build_skill_diff_identical_content_has_full_similarity() {
+        let base = fixture_version("Same description", "1.0.0", "same_hash");
+        let incoming = fixture_version("Same description", "1.0.0", "same_hash");
+
+        let diff = build_skill_diff(&base, &incoming);
+        assert_eq!(diff.similarity_score, 1.0);
+        assert!(diff.metadata_changes.is_empty());
+    }
+
+    #[test]
+    fn build_skill_diff_detects_metadata_changes() {
+        let base = fixture_version("Old description", "1.0.0", "hash_a");
+        let incoming = fixture_version("New description", "2.0.0", "hash_b");
+
+        let diff = build_skill_diff(&base, &incoming);
+        assert!(diff.similarity_score < 1.0);
+        // Should have description + version changes
+        let fields: Vec<&str> = diff.metadata_changes.iter().map(|c| c.field.as_str()).collect();
+        assert!(fields.contains(&"description"));
+        assert!(fields.contains(&"version"));
     }
 }

@@ -48,7 +48,7 @@ const emit = defineEmits<{
   (e: "createVersion"): void;
   (e: "selectSkill", skill: LocalSkill): void;
   (e: "adoptToRepo", path: string): void;
-  (e: "adoptManyToRepo", paths: string[]): void;
+  (e: "adoptManyToRepo", targets: Array<{ path: string; ideLabel: string }>): void;
   (e: "registerVersion", sourcePath: string, displayName: string, version: string): void;
   (e: "uninstallSkill", path: string): void;
 }>();
@@ -59,6 +59,7 @@ const selectedIds = ref<string[]>([]);
 const selectedVersionId = ref<string | null>(null);
 const platformFilter = ref<string>("all");
 const statusFilter = ref<string>("all");
+const activeStatusTags = ref<Set<string>>(new Set(["managed", "unmanaged"]));
 
 const platformOptions = computed(() => {
   const options = [{ id: "all", label: "all", count: props.localSkills.length }];
@@ -98,23 +99,86 @@ const skillScopeMap = computed(() => {
   return map;
 });
 
-function isSkillUsed(skill: LocalSkill): boolean {
-  return skill.usedBy.length > 0 || (projectUsageMap.value.get(skill.id)?.length ?? 0) > 0;
-}
+const skillHasNewVersionsMap = computed(() => {
+  const map = new Map<string, boolean>();
+  for (const ls of props.librarySkills) {
+    if (!ls.inRepo) continue;
+    const hasModifiedInstall = ls.installations.some((i) => i.syncStatus === "modified" && i.scope !== "plugin");
+    const hasUnmanagedInstall = ls.installations.some((i) => !i.isManaged && i.scope !== "plugin");
+    const hasConflictProject = ls.projectMappings.some((p) => p.status === "conflict");
+    if (hasModifiedInstall || hasUnmanagedInstall || hasConflictProject) {
+      map.set(ls.id, true);
+    }
+  }
+  return map;
+});
+
+const skillPluginCountMap = computed(() => {
+  const map = new Map<string, number>();
+  for (const ls of props.librarySkills) {
+    if (!ls.inRepo) continue;
+    const count = ls.installations.filter((i) => i.scope === "plugin").length;
+    if (count > 0) map.set(ls.id, count);
+  }
+  return map;
+});
+
+// Skills that are only deployed via plugins (no global IDE or project usage)
+const skillPluginOnlyMap = computed(() => {
+  const map = new Map<string, boolean>();
+  for (const ls of props.librarySkills) {
+    if (!ls.inRepo) continue;
+    const pluginCount = ls.installations.filter((i) => i.scope === "plugin").length;
+    if (pluginCount === 0) continue;
+    const globalCount = ls.installations.filter((i) => i.scope === "global" && i.isManaged).length;
+    const projectCount = ls.usedByProjectIds.length;
+    if (globalCount === 0 && projectCount === 0) {
+      map.set(ls.id, true);
+    }
+  }
+  return map;
+});
+
+const skillDefaultVersionMap = computed(() => {
+  const map = new Map<string, { displayName: string; versionCount: number }>();
+  for (const ls of props.librarySkills) {
+    if (!ls.inRepo) continue;
+    if (ls.defaultVersion) {
+      map.set(ls.id, {
+        displayName: ls.defaultVersion.displayName,
+        versionCount: ls.versionCount
+      });
+    }
+  }
+  return map;
+});
 
 const statusOptions = computed(() => {
-  const counts = {
-    all: props.librarySkills.length,
-    used: props.localSkills.filter((skill) => isSkillUsed(skill)).length,
-    unused: props.localSkills.filter((skill) => !isSkillUsed(skill)).length
-  };
+  const managed = props.librarySkills.filter((ls) => ls.inRepo).length;
+  const unmanaged = props.librarySkills.filter((ls) => !ls.inRepo).length;
+  const pluginOnly = skillPluginOnlyMap.value.size;
 
   return [
-    { id: "all", label: "all", count: counts.all },
-    { id: "used", label: "used", count: counts.used },
-    { id: "unused", label: "unused", count: counts.unused }
+    { id: "all", label: "all", count: props.librarySkills.length },
+    { id: "managed", label: "managed", count: managed },
+    { id: "unmanaged", label: "unmanaged", count: unmanaged },
+    { id: "pluginOnly", label: "pluginOnly", count: pluginOnly }
   ];
 });
+
+const statusTagCounts = computed(() => {
+  const pluginOnly = skillPluginOnlyMap.value.size;
+  const managed = props.librarySkills.filter((ls) => ls.inRepo).length - pluginOnly;
+  const unmanaged = props.librarySkills.filter((ls) => !ls.inRepo).length;
+  return { managed, unmanaged, pluginOnly };
+});
+
+function handleToggleStatusTag(tag: string) {
+  const next = new Set(activeStatusTags.value);
+  if (next.has(tag)) next.delete(tag);
+  else next.add(tag);
+  activeStatusTags.value = next;
+}
 
 const allSidebarSkills = computed<LocalSkill[]>(() => {
   // Start with repo skills
@@ -159,16 +223,15 @@ const filteredSidebarSkills = computed<LocalSkill[]>(() => {
       }
     }
 
-    if (statusFilter.value !== "all") {
-      if (statusFilter.value === "used" && !librarySkill.inRepo) {
-        return false;
-      }
-      if (statusFilter.value === "used" && librarySkill.inRepo && !isSkillUsed(skill)) {
-        return false;
-      }
-      if (statusFilter.value === "unused" && isSkillUsed(skill)) {
-        return false;
-      }
+    // Multi-select status tag filtering
+    if (activeStatusTags.value.size > 0) {
+      const isManaged = librarySkill.inRepo;
+      const isPluginOnly = skillPluginOnlyMap.value.has(skill.id);
+      let matched = false;
+      if (activeStatusTags.value.has("managed") && isManaged && !isPluginOnly) matched = true;
+      if (activeStatusTags.value.has("unmanaged") && !isManaged) matched = true;
+      if (activeStatusTags.value.has("pluginOnly") && isPluginOnly) matched = true;
+      if (!matched) return false;
     }
 
     if (!keyword) {
@@ -238,6 +301,12 @@ watch(selectedSkillId, (skillId) => {
     return;
   }
 
+  // Ensure package is loaded whenever selection changes (including auto-select)
+  const skill = allSidebarSkills.value.find((s) => s.id === skillId);
+  if (skill) {
+    emit("selectSkill", skill);
+  }
+
   const currentVersion = props.skillPackage?.versions.find((version) => version.isActive)
     || props.skillPackage?.versions.find((version) => version.id === props.skillPackage?.defaultVersion)
     || null;
@@ -267,7 +336,7 @@ watch(
 
 function handleSelectSkill(skill: LocalSkill): void {
   selectedSkillId.value = skill.id;
-  emit("selectSkill", skill);
+  // selectSkill emit is handled by the selectedSkillId watcher
 }
 
 function handleToggleSelected(skillId: string, checked: boolean): void {
@@ -314,22 +383,24 @@ function handleClearSelection(): void {
 }
 
 function handleAdoptSelected(): void {
-  // Get paths of selected unmanaged skills
+  // Get paths + IDE labels of selected unmanaged skills
   const unmanagedSkills = selectedIds.value
     .map((id) => props.librarySkills.find((ls) => ls.id === id))
     .filter((ls): ls is NonNullable<typeof ls> => !!ls && !ls.inRepo);
 
-  const paths: string[] = [];
+  const targets: Array<{ path: string; ideLabel: string }> = [];
   for (const ls of unmanagedSkills) {
     if (ls.unmanagedSources.length > 0) {
-      paths.push(ls.unmanagedSources[0].path);
+      for (const src of ls.unmanagedSources) {
+        targets.push({ path: src.path, ideLabel: src.ide });
+      }
     } else if (ls.path) {
-      paths.push(ls.path);
+      targets.push({ path: ls.path, ideLabel: "" });
     }
   }
 
-  if (paths.length > 0) {
-    emit("adoptManyToRepo", paths);
+  if (targets.length > 0) {
+    emit("adoptManyToRepo", targets);
   }
 }
 
@@ -339,6 +410,26 @@ function handleInstallSelected(): void {
   }
 
   emit("installMany", selectedSkills.value);
+}
+
+function handleCloneSelected(): void {
+  // Clone selected repo skills to the first project that has IDE targets configured
+  const repoSkillIds = selectedIds.value
+    .filter((id) => {
+      const ls = props.librarySkills.find((s) => s.id === id);
+      return ls && ls.inRepo;
+    });
+
+  if (repoSkillIds.length === 0) return;
+
+  const project = props.projects.find((p) => p.ideTargets.length > 0);
+  if (!project) return;
+
+  emit("cloneToProject", {
+    id: project.id,
+    name: project.name,
+    ideTargets: project.ideTargets
+  }, repoSkillIds);
 }
 
 function handleDeleteAll(): void {
@@ -477,21 +568,29 @@ onUnmounted(() => {
       :ide-options="ideOptions"
       :platform-filter="platformFilter"
       :status-filter="statusFilter"
+      :active-status-tags="activeStatusTags"
+      :status-tag-counts="statusTagCounts"
       :platform-options="platformOptions"
       :status-options="statusOptions"
       :project-usage-map="projectUsageMap"
       :skill-status-map="skillStatusMap"
       :skill-scope-map="skillScopeMap"
+      :skill-has-new-versions-map="skillHasNewVersionsMap"
+      :skill-default-version-map="skillDefaultVersionMap"
+      :skill-plugin-count-map="skillPluginCountMap"
+      :skill-plugin-only-map="skillPluginOnlyMap"
       @select="handleSelectSkill"
       @toggle-selected="handleToggleSelected"
       @toggle-select-all="handleToggleSelectAll"
       @install-selected="handleInstallSelected"
+      @clone-selected="handleCloneSelected"
       @adopt-selected="handleAdoptSelected"
       @delete-selected="handleDeleteSelected"
       @clear-selection="handleClearSelection"
       @delete-all="handleDeleteAll"
       @update:platform-filter="platformFilter = $event"
       @update:status-filter="statusFilter = $event"
+      @toggle-status-tag="handleToggleStatusTag"
       @refresh="$emit('refresh')"
       @import="$emit('import')"
     />

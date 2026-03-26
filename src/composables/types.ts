@@ -504,7 +504,7 @@ export type LibrarySkill = {
   projectMappings: LibraryProjectMapping[];
   usedByProjectIds: string[];
   inRepo: boolean;
-  skillScope: "repo" | "global" | "project";
+  skillScope: "repo" | "global" | "project" | "plugin";
   displayPath: string;
   unmanagedSources: Array<{
     ide: string;

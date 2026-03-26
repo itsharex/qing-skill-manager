@@ -132,11 +132,13 @@ const detectedVersions = computed(() => {
     }
   }
 
-  // Global installations that are modified or matched to deleted version
+  // Installations that are modified, unmanaged (non-plugin), or matched to deleted version
   for (const inst of props.librarySkill.installations) {
+    if (inst.scope === "plugin") continue; // Plugin skills are read-only, not unregistered versions
     const isModified = inst.syncStatus === "modified";
+    const isUnmanaged = !inst.isManaged;
     const isDeletedVersion = inst.versionId && !activeVersionIds.has(inst.versionId);
-    if (!isModified && !isDeletedVersion) continue;
+    if (!isModified && !isUnmanaged && !isDeletedVersion) continue;
     // Skip if this path is inside a detected project
     const isProjectCopy = detectProjectPaths.has(inst.skillPath) ||
       [...detectProjectPaths].some((pp) => inst.skillPath.startsWith(pp + "/"));
@@ -144,10 +146,11 @@ const detectedVersions = computed(() => {
 
     if (!seenPaths.has(inst.skillPath)) {
       seenPaths.add(inst.skillPath);
+      const scopeLabel = inst.scope === "project" ? t("ide.scopeProject") : t("ide.scopeGlobal");
       results.push({
         id: `detected_${inst.skillPath}`,
-        label: `${inst.ideLabel} (${t("ide.scopeGlobal")})`,
-        scope: "global",
+        label: `${inst.ideLabel} (${scopeLabel})`,
+        scope: inst.scope,
         path: inst.skillPath
       });
     }
@@ -285,6 +288,7 @@ const groupedUnmanagedSources = computed(() => {
           <button class="ghost action-btn" @click="startRegister(dv.path)">{{ t("library.versions.register") }}</button>
         </div>
       </article>
+
     </div>
 
     <!-- Register version form -->
@@ -486,6 +490,7 @@ const groupedUnmanagedSources = computed(() => {
   opacity: 0.8;
   border-style: dashed;
 }
+
 
 .source-entry {
   padding: 4px 0;
