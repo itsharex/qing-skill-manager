@@ -1,6 +1,12 @@
-# Qing Skill Manager
+<p align="center">
+  <img src="src-tauri/icons/128x128.png" width="80" alt="Qing Skill Manager" />
+</p>
 
-[English](README.md) | [中文](README_zh-CN.md)
+<h1 align="center">Qing Skill Manager</h1>
+
+<p align="center">
+  <a href="README.md">English</a> | <a href="README_zh-CN.md">中文</a>
+</p>
 
 > 在一个桌面应用中管理你设备上所有的 AI 技能 —— 跨项目、跨 Agent IDE、统一掌控。
 

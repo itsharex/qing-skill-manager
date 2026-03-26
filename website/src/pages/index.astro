@@ -14,7 +14,10 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
   <!-- ========== NAV ========== -->
   <nav class="sticky top-0 z-50 backdrop-blur-xl bg-background/70 border-b border-border/50">
     <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-      <a href={`${BASE}/`} class="font-semibold text-lg tracking-tight">Qing Skill Manager</a>
+      <a href={`${BASE}/`} class="flex items-center gap-2 font-semibold text-lg tracking-tight">
+        <img src={`${BASE}/favicon-32x32.png`} alt="" class="w-6 h-6 rounded" />
+        Qing Skill Manager
+      </a>
       <div class="flex items-center gap-2">
         <a href="#features" class="hidden sm:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
         <a href="#screenshots" class="hidden sm:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">Screenshots</a>

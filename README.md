@@ -1,6 +1,12 @@
-# Qing Skill Manager
+<p align="center">
+  <img src="src-tauri/icons/128x128.png" width="80" alt="Qing Skill Manager" />
+</p>
 
-[English](README.md) | [中文](README_zh-CN.md)
+<h1 align="center">Qing Skill Manager</h1>
+
+<p align="center">
+  <a href="README.md">English</a> | <a href="README_zh-CN.md">中文</a>
+</p>
 
 > Manage all the AI skills on your machine — across every project and every Agent IDE — from a single desktop app.
 
