@@ -2927,7 +2927,7 @@ dependencies = [
 
 [[package]]
 name = "qing-skill-manager"
-version = "0.3.22"
+version = "0.3.23"
 dependencies = [
  "dirs 5.0.1",
  "serde",
