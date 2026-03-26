@@ -45,7 +45,9 @@ function cancelRename(): void {
 }
 
 const sortedVersions = computed<SkillVersion[]>(() => {
-  return [...(props.skillPackage?.versions || [])].sort((a, b) => b.createdAt - a.createdAt);
+  return [...(props.skillPackage?.versions || [])]
+    .filter((v) => v.isActive)
+    .sort((a, b) => b.createdAt - a.createdAt);
 });
 
 function isDefault(versionId: string): boolean {
