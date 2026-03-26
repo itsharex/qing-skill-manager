@@ -5,7 +5,7 @@
 > A desktop app for discovering, managing, and distributing AI skills across multiple IDEs and projects.
 
 <p align="center">
-  <img src="docs/screenshots/en-US/market.png" width="720" alt="Marketplace Search" />
+  <img src="docs/screenshots/en-US/market.jpg" width="720" alt="Marketplace Search" />
 </p>
 
 Qing Skill Manager gives you a single place to search public skill marketplaces, store skills in a local repository, install them globally to any supported IDE, and clone versioned copies into individual projects — with conflict detection and resolution built in.
@@ -16,11 +16,11 @@ Built with **Tauri 2 + Vue 3 + Rust**. Cross-platform desktop app.
 
 | Local Skills | Market |
 |:---:|:---:|
-| ![Local Skills](docs/screenshots/en-US/local.png) | ![Market](docs/screenshots/en-US/market.png) |
+| ![Local Skills](docs/screenshots/en-US/local.jpg) | ![Market](docs/screenshots/en-US/market.jpg) |
 
 | IDE Browser | Projects |
 |:---:|:---:|
-| ![IDE Browser](docs/screenshots/en-US/ide.png) | ![Projects](docs/screenshots/en-US/project.png) |
+| ![IDE Browser](docs/screenshots/en-US/ide.jpg) | ![Projects](docs/screenshots/en-US/project.jpg) |
 
 ## Features
 
