@@ -28,10 +28,31 @@ const isInstalling = computed<boolean>(() => {
 });
 
 const globalInstallations = computed(() => {
-  const all = props.librarySkill?.installations.filter((i) => i.scope === "global") || [];
-  if (!props.selectedVersionId) return all;
-  return all.filter((i) => i.versionId === props.selectedVersionId);
+  // For managed skills, use installations data
+  if (props.librarySkill?.inRepo) {
+    const all = props.librarySkill.installations.filter((i) => i.scope === "global");
+    if (!props.selectedVersionId) return all;
+    return all.filter((i) => i.versionId === props.selectedVersionId);
+  }
+  // For unmanaged skills, show global sources as installations
+  return (props.librarySkill?.unmanagedSources || [])
+    .filter((s) => s.scope === "global")
+    .map((s) => ({
+      ideId: s.ide, ideLabel: s.label, skillPath: s.path,
+      versionId: null, isManaged: false, scope: "global" as const,
+      syncStatus: "unknown" as const
+    }));
 });
+
+const projectInstallations = computed(() =>
+  (props.librarySkill?.unmanagedSources || [])
+    .filter((s) => s.scope === "project")
+    .map((s) => ({
+      ideId: s.ide, ideLabel: s.label, skillPath: s.path,
+      versionId: null, isManaged: false, scope: "project" as const,
+      syncStatus: "unknown" as const
+    }))
+);
 
 const versionProjectMappings = computed(() => {
   const all = props.librarySkill?.projectMappings || [];
@@ -107,59 +128,33 @@ function getMappingDescription(status: string): string {
       </div>
     </div>
 
-    <!-- Unmanaged skill detail -->
-    <div v-else-if="!librarySkill.inRepo" class="skill-detail">
-      <div class="detail-header">
-        <div class="skill-identity">
-          <h1 class="skill-title"><span class="repo-dot not-in-repo">○</span> {{ skill.name }}</h1>
-          <div class="skill-subtitle">
-            <span class="status-badge unmanaged">{{ t("library.status.unmanaged") }}</span>
-            <span class="version-meta-text">{{ librarySkill.unmanagedSources.length }} {{ t("library.versions.locations") }}</span>
-          </div>
-        </div>
-        <div class="header-actions">
-          <button class="primary" @click="$emit('adoptToRepo', librarySkill.unmanagedSources[0]?.path || skill.path)">{{ t("library.adoptToRepo") }}</button>
-        </div>
-      </div>
-
-      <section class="panel hero-panel">
-        <p class="card-desc">{{ t("library.unmanagedDesc") }}</p>
-      </section>
-
-      <section class="panel section-panel">
-        <div class="section-title-row">
-          <div class="panel-title section-title-text">{{ t("library.versions.sources") }}</div>
-        </div>
-        <div class="install-list">
-          <div v-for="src in librarySkill.unmanagedSources" :key="src.path" class="install-entry">
-            <div class="install-info">
-              <span class="install-ide">{{ src.label }}</span>
-              <span class="mapping-badge muted">{{ src.ide }} · {{ src.scope === "global" ? t("ide.scopeGlobal") : t("ide.scopeProject") }}</span>
-            </div>
-            <div class="install-actions">
-              <button class="ghost btn-xs" @click="$emit('openDir', src.path)">{{ t("ide.openDir") }}</button>
-              <button class="ghost danger btn-xs" @click="$emit('uninstallSkill', src.path)">{{ t("ide.uninstall") }}</button>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-
-    <!-- Managed skill detail -->
     <div v-else class="skill-detail">
       <div class="detail-header">
         <div class="skill-identity">
-          <h1 class="skill-title"><span class="repo-dot in-repo">●</span> {{ skill.name }}</h1>
+          <h1 class="skill-title">
+            <span class="repo-dot" :class="librarySkill.inRepo ? 'in-repo' : 'not-in-repo'">{{ librarySkill.inRepo ? "●" : "○" }}</span>
+            {{ skill.name }}
+          </h1>
           <div class="skill-subtitle">
-            <span v-if="skill.currentVersion" class="version-chip">{{ skill.currentVersion.displayName }}</span>
-            <span class="version-meta-text">{{ t("library.detail.versionCount", { count: skill.versionCount }) }}</span>
-            <span class="version-meta-text">{{ t("library.usedInProjects", { count: librarySkill.usedByProjectIds.length }) }}</span>
+            <template v-if="librarySkill.inRepo">
+              <span v-if="skill.currentVersion" class="version-chip">{{ skill.currentVersion.displayName }}</span>
+              <span class="version-meta-text">{{ t("library.detail.versionCount", { count: skill.versionCount }) }}</span>
+              <span class="version-meta-text">{{ t("library.usedInProjects", { count: librarySkill.usedByProjectIds.length }) }}</span>
+            </template>
+            <template v-else>
+              <span class="status-badge unmanaged">{{ t("library.status.unmanaged") }}</span>
+            </template>
           </div>
         </div>
 
         <div class="header-actions">
-          <button class="ghost" @click="$emit('openDir', skill.path)">{{ t("library.detail.openRepoDir") }}</button>
-          <button class="ghost danger btn-sm" @click="$emit('delete', skill)">{{ t("library.detail.deleteFromRepo") }}</button>
+          <template v-if="librarySkill.inRepo">
+            <button class="ghost" @click="$emit('openDir', skill.path)">{{ t("library.detail.openRepoDir") }}</button>
+            <button class="ghost danger btn-sm" @click="$emit('delete', skill)">{{ t("library.detail.deleteFromRepo") }}</button>
+          </template>
+          <template v-else>
+            <button class="primary" @click="$emit('adoptToRepo', librarySkill.unmanagedSources[0]?.path || skill.path)">{{ t("library.adoptToRepo") }}</button>
+          </template>
         </div>
       </div>
 
@@ -167,13 +162,9 @@ function getMappingDescription(status: string): string {
         <p class="card-desc">{{ skill.description || t("library.detail.noDescription") }}</p>
         <div class="detail-meta-row">
           <span class="detail-label">{{ t("library.detail.path") }}</span>
-          <code class="card-link path-value">{{ skill.path }}</code>
+          <code class="card-link path-value">{{ librarySkill.displayPath }}</code>
         </div>
-        <div v-if="skill.source" class="detail-meta-row">
-          <span class="detail-label">{{ t("library.detail.source") }}</span>
-          <span>{{ skill.source }}</span>
-        </div>
-        <div class="actions buttons">
+        <div v-if="librarySkill.inRepo" class="actions buttons">
           <button class="primary" :disabled="isInstalling" @click="$emit('install', skill)">
             {{ isInstalling ? t("library.detail.installing") : t("library.detail.installToIde") }}
           </button>
@@ -208,48 +199,70 @@ function getMappingDescription(status: string): string {
       <section class="panel section-panel">
         <div class="section-title-row">
           <div class="panel-title section-title-text">{{ t("library.projectDeployments") }}</div>
+          <div class="hint">{{ librarySkill.inRepo ? '' : `${projectInstallations.length} ${t("library.versions.locations")}` }}</div>
         </div>
-        <div v-if="versionProjectMappings.length === 0" class="hint">{{ selectedVersionId ? t("library.noProjectForVersion") : t("library.notUsedInProjects") }}</div>
-        <div v-else class="mapping-list">
-          <article v-for="mapping in versionProjectMappings" :key="mapping.projectId" class="card mapping-card">
-            <div class="mapping-header">
-              <div class="mapping-title-block">
-                <div class="card-title">{{ mapping.projectName }}</div>
-                <span class="mapping-badge" :class="getMappingBadgeClass(mapping.status)">{{ getMappingLabel(mapping.status) }}</span>
+
+        <!-- Managed: show project mappings -->
+        <template v-if="librarySkill.inRepo">
+          <div v-if="versionProjectMappings.length === 0" class="hint">{{ selectedVersionId ? t("library.noProjectForVersion") : t("library.notUsedInProjects") }}</div>
+          <div v-else class="mapping-list">
+            <article v-for="mapping in versionProjectMappings" :key="mapping.projectId" class="card mapping-card">
+              <div class="mapping-header">
+                <div class="mapping-title-block">
+                  <div class="card-title">{{ mapping.projectName }}</div>
+                  <span class="mapping-badge" :class="getMappingBadgeClass(mapping.status)">{{ getMappingLabel(mapping.status) }}</span>
+                </div>
+              </div>
+              <div class="mapping-detail">
+                <div class="mapping-detail-row">
+                  <span class="detail-label">{{ t("library.detail.path") }}</span>
+                  <code class="card-link path-value">{{ mapping.projectPath }}</code>
+                </div>
+                <div class="mapping-detail-row">
+                  <span class="detail-label">{{ t("library.versionLabel") }}</span>
+                  <span>{{ mapping.versionName || t("library.mappingEmptyVersion") }}</span>
+                </div>
+                <div class="mapping-detail-row">
+                  <span class="detail-label">IDE</span>
+                  <span>{{ mapping.ideTargets.join(", ") || "—" }}</span>
+                </div>
+                <div class="mapping-status-desc hint">{{ getMappingDescription(mapping.status) }}</div>
+              </div>
+              <div class="mapping-action">
+                <template v-if="mapping.status === 'missing'">
+                  <button class="ghost btn-sm" @click="$emit('cloneToProject', mapping.projectId)">{{ t("library.actions.clone") }}</button>
+                </template>
+                <template v-else>
+                  <button class="ghost btn-xs" @click="$emit('openDir', mapping.projectPath)">{{ t("ide.openDir") }}</button>
+                  <button class="ghost danger btn-xs" @click="$emit('uninstallSkill', mapping.projectPath + '/' + (skill?.name || ''))">{{ t("ide.uninstall") }}</button>
+                </template>
+              </div>
+            </article>
+          </div>
+          <div v-if="!selectedVersionId && cloneProjects.some((p) => !p.mapped)" class="clone-grid">
+            <button v-for="project in cloneProjects.filter((p) => !p.mapped)" :key="project.id" class="ghost clone-button" @click="$emit('cloneToProject', project.id)">
+              <span>{{ t("library.actions.clone") }} · {{ project.name }}</span>
+              <span class="hint">{{ project.ideTargets.join(", ") || t("projects.emptyHint") }}</span>
+            </button>
+          </div>
+        </template>
+
+        <!-- Unmanaged: show project sources -->
+        <template v-else>
+          <div v-if="projectInstallations.length === 0" class="hint">{{ t("library.notUsedInProjects") }}</div>
+          <div v-else class="install-list">
+            <div v-for="inst in projectInstallations" :key="inst.skillPath" class="install-entry">
+              <div class="install-info">
+                <span class="install-ide">{{ inst.ideLabel }}</span>
+                <span class="mapping-badge muted">{{ inst.ideId }}</span>
+              </div>
+              <div class="install-actions">
+                <button class="ghost btn-xs" @click="$emit('openDir', inst.skillPath)">{{ t("ide.openDir") }}</button>
+                <button class="ghost danger btn-xs" @click="$emit('uninstallSkill', inst.skillPath)">{{ t("ide.uninstall") }}</button>
               </div>
             </div>
-            <div class="mapping-detail">
-              <div class="mapping-detail-row">
-                <span class="detail-label">{{ t("library.detail.path") }}</span>
-                <code class="card-link path-value">{{ mapping.projectPath }}</code>
-              </div>
-              <div class="mapping-detail-row">
-                <span class="detail-label">{{ t("library.versionLabel") }}</span>
-                <span>{{ mapping.versionName || t("library.mappingEmptyVersion") }}</span>
-              </div>
-              <div class="mapping-detail-row">
-                <span class="detail-label">IDE</span>
-                <span>{{ mapping.ideTargets.join(", ") || "—" }}</span>
-              </div>
-              <div class="mapping-status-desc hint">{{ getMappingDescription(mapping.status) }}</div>
-            </div>
-            <div class="mapping-action">
-              <template v-if="mapping.status === 'missing'">
-                <button class="ghost btn-sm" @click="$emit('cloneToProject', mapping.projectId)">{{ t("library.actions.clone") }}</button>
-              </template>
-              <template v-else>
-                <button class="ghost btn-xs" @click="$emit('openDir', mapping.projectPath)">{{ t("ide.openDir") }}</button>
-                <button class="ghost danger btn-xs" @click="$emit('uninstallSkill', mapping.projectPath + '/' + (skill?.name || ''))">{{ t("ide.uninstall") }}</button>
-              </template>
-            </div>
-          </article>
-        </div>
-        <div v-if="!selectedVersionId && cloneProjects.some((p) => !p.mapped)" class="clone-grid">
-          <button v-for="project in cloneProjects.filter((p) => !p.mapped)" :key="project.id" class="ghost clone-button" @click="$emit('cloneToProject', project.id)">
-            <span>{{ t("library.actions.clone") }} · {{ project.name }}</span>
-            <span class="hint">{{ project.ideTargets.join(", ") || t("projects.emptyHint") }}</span>
-          </button>
-        </div>
+          </div>
+        </template>
       </section>
     </div>
   </main>
