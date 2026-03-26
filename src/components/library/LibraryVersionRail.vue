@@ -81,41 +81,40 @@ function getSyncIcon(status: string): string {
   return "?";
 }
 
-// Detect unregistered versions: IDE/project copies that don't match any repo version
+// Detect unregistered versions: only truly unmatched copies (not synced, not matched to any version)
 const detectedVersions = computed(() => {
   if (!props.librarySkill) return [];
-  const repoVersionIds = new Set(sortedVersions.value.map((v) => v.id));
   const results: Array<{ id: string; label: string; scope: string; path: string }> = [];
   const seen = new Set<string>();
 
+  // Only global installations that are genuinely modified (have sidecar but content changed)
   for (const inst of props.librarySkill.installations) {
-    if (inst.scope === "plugin") continue;
-    if (inst.syncStatus === "modified" || (inst.syncStatus === "unknown" && !inst.versionId)) {
-      const key = `${inst.ideLabel}_${inst.scope}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        results.push({
-          id: `detected_${inst.skillPath}`,
-          label: `${inst.ideLabel} (${inst.scope === "global" ? t("ide.scopeGlobal") : t("ide.scopeProject")})`,
-          scope: inst.scope,
-          path: inst.skillPath
-        });
-      }
+    if (inst.scope !== "global") continue;
+    if (inst.syncStatus !== "modified") continue;
+    const key = inst.skillPath;
+    if (!seen.has(key)) {
+      seen.add(key);
+      results.push({
+        id: `detected_${key}`,
+        label: `${inst.ideLabel} (${t("ide.scopeGlobal")})`,
+        scope: inst.scope,
+        path: inst.skillPath
+      });
     }
   }
 
+  // Only project mappings with status "conflict" (content doesn't match ANY known version)
   for (const pm of props.librarySkill.projectMappings) {
-    if (pm.status === "conflict" || (pm.status === "modified" && pm.versionId && !repoVersionIds.has(pm.versionId))) {
-      const key = `project_${pm.projectId}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        results.push({
-          id: `detected_${pm.projectId}`,
-          label: pm.projectName,
-          scope: "project",
-          path: pm.projectPath
-        });
-      }
+    if (pm.status !== "conflict") continue;
+    const key = `project_${pm.projectId}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      results.push({
+        id: `detected_${key}`,
+        label: `${pm.projectName} (${t("ide.scopeProject")})`,
+        scope: "project",
+        path: pm.projectPath
+      });
     }
   }
 
