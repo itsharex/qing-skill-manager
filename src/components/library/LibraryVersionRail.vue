@@ -115,17 +115,22 @@ const detectedVersions = computed(() => {
     }
   }
 
-  // Project mappings with conflict
+  // Project mappings with conflict — find actual skill path from installations
   for (const pm of props.librarySkill.projectMappings) {
     if (pm.status !== "conflict") continue;
+    // Find the project-scope installation to get the real skill path
+    const projectInst = props.librarySkill.installations.find(
+      (i) => i.scope === "project" && i.skillPath.startsWith(pm.projectPath + "/")
+    );
+    const skillPath = projectInst?.skillPath || pm.projectPath;
     const key = `project_${pm.projectId}`;
     if (!seenPaths.has(key)) {
       seenPaths.add(key);
       results.push({
         id: key,
-        label: `${pm.projectName}`,
+        label: pm.projectName,
         scope: "project",
-        path: pm.projectPath
+        path: skillPath
       });
     }
   }
