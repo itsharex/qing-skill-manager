@@ -73,19 +73,11 @@ pub fn scan_overview(request: LocalScanRequest) -> Result<Overview, String> {
     // Resolve IDE directories: absolute paths are used directly, relative paths are joined with home
     let ide_dirs: Vec<(String, PathBuf)> = if request.ide_dirs.is_empty() {
         vec![
-            (
-                "Antigravity".to_string(),
-                home.join(".gemini/antigravity/skills"),
-            ),
-            ("Claude".to_string(), home.join(".claude/skills")),
-            ("CodeBuddy".to_string(), home.join(".codebuddy/skills")),
+            ("Claude Code".to_string(), home.join(".claude/skills")),
             ("Codex".to_string(), home.join(".codex/skills")),
             ("Cursor".to_string(), home.join(".cursor/skills")),
-            ("Kiro".to_string(), home.join(".kiro/skills")),
-            ("Qoder".to_string(), home.join(".qoder/skills")),
-            ("Trae".to_string(), home.join(".trae/skills")),
-            ("VSCode".to_string(), home.join(".github/skills")),
-            ("Windsurf".to_string(), home.join(".windsurf/skills")),
+            ("OpenClaw".to_string(), home.join(".openclaw/skills")),
+            ("OpenCode".to_string(), home.join(".config/opencode/skills")),
         ]
     } else {
         request
@@ -125,22 +117,30 @@ pub fn scan_overview(request: LocalScanRequest) -> Result<Overview, String> {
         ));
     }
 
-    if let Some(project) = request.project_dir {
-        let base = PathBuf::from(project);
-        for (label, dir) in &ide_dirs {
-            // For absolute paths, also check the same path under project
-            // For relative paths, join with project directory
-            let project_dir = if dir.is_absolute() {
-                dir.clone()
-            } else {
-                base.join(dir)
-            };
-            ide_skills.extend(collect_ide_skills(
-                &project_dir,
-                label,
-                &manager_map,
-                &mut manager_skills,
-            ));
+    // Project-level IDE skill directories (e.g., project/.claude/skills)
+    let project_ide_patterns = [
+        ("Claude Code", ".claude/skills"),
+        ("Codex", ".codex/skills"),
+        ("Cursor", ".cursor/skills"),
+        ("OpenClaw", ".openclaw/skills"),
+        ("OpenCode", ".opencode/skills"),
+    ];
+
+    for project_path in &request.project_dirs {
+        let base = PathBuf::from(project_path);
+        if !base.exists() {
+            continue;
+        }
+        for (label, relative_dir) in &project_ide_patterns {
+            let project_dir = base.join(relative_dir);
+            if project_dir.exists() && project_dir.is_dir() {
+                ide_skills.extend(collect_ide_skills(
+                    &project_dir,
+                    label,
+                    &manager_map,
+                    &mut manager_skills,
+                ));
+            }
         }
     }
 
@@ -343,31 +343,31 @@ pub fn scan_project_ide_dirs(request: ProjectScanRequest) -> Result<ProjectScanR
         return Err("Project directory does not exist".to_string());
     }
 
-    let ide_dir_patterns = [
-        (".gemini/antigravity/skills", "Antigravity"),
-        (".claude/skills", "Claude Code"),
-        (".codebuddy/skills", "CodeBuddy"),
-        (".codex/skills", "Codex"),
-        (".cursor/skills", "Cursor"),
-        (".kiro/skills", "Kiro"),
-        (".openclaw/skills", "OpenClaw"),
-        (".config/opencode/skills", "OpenCode"),
-        (".qoder/skills", "Qoder"),
-        (".trae/skills", "Trae"),
-        (".github/skills", "VSCode"),
-        (".windsurf/skills", "Windsurf"),
+    // IDE characteristic files/directories for detection
+    let ide_signatures: Vec<(&str, &str, Vec<&str>)> = vec![
+        ("Claude Code", ".claude/skills", vec![".claude", "CLAUDE.md"]),
+        ("Codex", ".codex/skills", vec![".codex"]),
+        ("Cursor", ".cursor/skills", vec![".cursor", ".cursorrules", ".cursorignore"]),
+        ("OpenClaw", ".openclaw/skills", vec![".openclaw"]),
+        ("OpenCode", ".opencode/skills", vec![".opencode", ".config/opencode"]),
     ];
 
     let mut detected_ide_dirs = Vec::new();
+    let mut detected_labels = std::collections::HashSet::new();
 
-    for (relative_path, label) in ide_dir_patterns.iter() {
-        let ide_path = project_dir.join(relative_path);
-        if ide_path.exists() && ide_path.is_dir() {
+    for (label, skills_dir, signatures) in ide_signatures.iter() {
+        let skills_path = project_dir.join(skills_dir);
+        let has_skills_dir = skills_path.exists() && skills_path.is_dir();
+        let has_signature = signatures.iter().any(|sig| project_dir.join(sig).exists());
+
+        if has_skills_dir || has_signature {
             detected_ide_dirs.push(ProjectIdeDir {
                 label: label.to_string(),
-                relative_dir: relative_path.to_string(),
-                absolute_path: ide_path.display().to_string(),
+                relative_dir: skills_dir.to_string(),
+                absolute_path: skills_path.display().to_string(),
+                inferred: !has_skills_dir && has_signature,
             });
+            detected_labels.insert(label.to_string());
         }
     }
 

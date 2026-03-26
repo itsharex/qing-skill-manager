@@ -166,7 +166,8 @@ const {
   handleConflictResolution: handleConflictResolutionRaw,
   handleImportSelected,
   handleResolveConflictFromImport,
-  handleCloneSkillsToProject
+  handleCloneSkillsToProject,
+  rescanAllProjectIdes
 } = useProjectHandlers({
   projects,
   selectedProjectId,
@@ -200,6 +201,9 @@ onMounted(() => {
   loadProjects();
   void refreshProjectSkillSnapshots();
   restartProjectSnapshotRefreshLoop();
+  void rescanAllProjectIdes();
+  // Periodic rescan every 5 minutes to detect new IDE usage
+  setInterval(() => void rescanAllProjectIdes(), 5 * 60 * 1000);
 });
 
 watch(projects, () => {

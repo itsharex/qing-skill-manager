@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onUnmounted } from "vue";
 import LibrarySidebar from "./LibrarySidebar.vue";
 import LibraryDetailPanel from "./LibraryDetailPanel.vue";
 import LibraryVersionRail from "./LibraryVersionRail.vue";
@@ -69,15 +69,13 @@ const platformOptions = computed(() => {
 const statusOptions = computed(() => {
   const counts = {
     all: props.librarySkills.length,
-    linked: props.librarySkills.filter((skill) => skill.usedByProjectIds.length > 0).length,
-    active: props.localSkills.filter((skill) => skill.currentVersion?.isActive).length,
-    unused: props.localSkills.filter((skill) => skill.usedBy.length === 0 && !skill.currentVersion?.isActive).length
+    used: props.localSkills.filter((skill) => skill.usedBy.length > 0).length,
+    unused: props.localSkills.filter((skill) => skill.usedBy.length === 0).length
   };
 
   return [
     { id: "all", label: "all", count: counts.all },
-    { id: "linked", label: "linked", count: counts.linked },
-    { id: "active", label: "active", count: counts.active },
+    { id: "used", label: "used", count: counts.used },
     { id: "unused", label: "unused", count: counts.unused }
   ];
 });
@@ -96,13 +94,10 @@ const filteredSidebarSkills = computed<LocalSkill[]>(() => {
     }
 
     if (statusFilter.value !== "all") {
-      if (statusFilter.value === "linked" && librarySkill.usedByProjectIds.length === 0) {
+      if (statusFilter.value === "used" && skill.usedBy.length === 0) {
         return false;
       }
-      if (statusFilter.value === "active" && !skill.currentVersion?.isActive) {
-        return false;
-      }
-      if (statusFilter.value === "unused" && (skill.usedBy.length > 0 || skill.currentVersion?.isActive)) {
+      if (statusFilter.value === "unused" && skill.usedBy.length > 0) {
         return false;
       }
     }
@@ -284,12 +279,88 @@ function handleCompareSelectedVersion(versionId: string): void {
 function handleSelectVersion(version: SkillVersion): void {
   selectedVersionId.value = version.id;
 }
+
+// --- Draggable splitter logic ---
+const LAYOUT_STORAGE_KEY = "qingSkillManager.libraryLayout";
+const MIN_SIDEBAR = 220;
+const MIN_DETAIL = 280;
+const MIN_RAIL = 200;
+const DEFAULT_SIDEBAR = 340;
+const DEFAULT_RAIL = 260;
+
+function loadLayout(): { sidebar: number; rail: number } {
+  try {
+    const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.sidebar === "number" && typeof parsed.rail === "number") {
+        return parsed;
+      }
+    }
+  } catch { /* ignore */ }
+  return { sidebar: DEFAULT_SIDEBAR, rail: DEFAULT_RAIL };
+}
+
+function saveLayout(sidebar: number, rail: number): void {
+  localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify({ sidebar, rail }));
+}
+
+const saved = loadLayout();
+const sidebarWidth = ref(saved.sidebar);
+const railWidth = ref(saved.rail);
+const workspaceRef = ref<HTMLElement | null>(null);
+
+let dragging: "left" | "right" | null = null;
+let startX = 0;
+let startValue = 0;
+
+function onSplitterDown(side: "left" | "right", e: MouseEvent): void {
+  e.preventDefault();
+  dragging = side;
+  startX = e.clientX;
+  startValue = side === "left" ? sidebarWidth.value : railWidth.value;
+  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener("mouseup", onMouseUp);
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+}
+
+function onMouseMove(e: MouseEvent): void {
+  if (!dragging || !workspaceRef.value) return;
+  const totalWidth = workspaceRef.value.offsetWidth;
+  const splitterTotal = 8; // 2 splitters * 4px
+
+  if (dragging === "left") {
+    const newSidebar = Math.max(MIN_SIDEBAR, Math.min(startValue + (e.clientX - startX), totalWidth - railWidth.value - MIN_DETAIL - splitterTotal));
+    sidebarWidth.value = newSidebar;
+  } else {
+    const newRail = Math.max(MIN_RAIL, Math.min(startValue - (e.clientX - startX), totalWidth - sidebarWidth.value - MIN_DETAIL - splitterTotal));
+    railWidth.value = newRail;
+  }
+}
+
+function onMouseUp(): void {
+  if (dragging) {
+    saveLayout(sidebarWidth.value, railWidth.value);
+  }
+  dragging = null;
+  document.removeEventListener("mousemove", onMouseMove);
+  document.removeEventListener("mouseup", onMouseUp);
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+}
+
+onUnmounted(() => {
+  document.removeEventListener("mousemove", onMouseMove);
+  document.removeEventListener("mouseup", onMouseUp);
+});
 </script>
 
 <template>
-  <div class="library-workspace">
+  <div ref="workspaceRef" class="library-workspace">
     <LibrarySidebar
       v-model:search-query="searchQuery"
+      :style="{ width: sidebarWidth + 'px', minWidth: MIN_SIDEBAR + 'px', flexShrink: 0 }"
       :skills="filteredSidebarSkills"
       :selected-skill-id="selectedSkillId"
       :selected-ids="selectedIds"
@@ -312,6 +383,8 @@ function handleSelectVersion(version: SkillVersion): void {
       @import="$emit('import')"
     />
 
+    <div class="splitter" @mousedown="onSplitterDown('left', $event)" />
+
     <LibraryDetailPanel
       :skill="selectedSkill"
       :library-skill="selectedLibrarySkill"
@@ -325,7 +398,10 @@ function handleSelectVersion(version: SkillVersion): void {
       @delete="handleDelete"
     />
 
+    <div class="splitter" @mousedown="onSplitterDown('right', $event)" />
+
     <LibraryVersionRail
+      :style="{ width: railWidth + 'px', minWidth: MIN_RAIL + 'px', flexShrink: 0 }"
       :skill="selectedSkill"
       :selected-version-id="selectedVersion?.id || null"
       :skill-package="skillPackage"
@@ -345,5 +421,17 @@ function handleSelectVersion(version: SkillVersion): void {
   width: 100%;
   overflow: hidden;
   background: var(--color-bg);
+}
+
+.splitter {
+  flex-shrink: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: var(--color-card-border, #e0e0e0);
+  transition: background 0.15s;
+}
+
+.splitter:hover {
+  background: var(--color-primary, #4a90d9);
 }
 </style>

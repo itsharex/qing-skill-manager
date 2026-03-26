@@ -102,6 +102,8 @@ export type ProjectIdeDir = {
   label: string;
   relativeDir: string;
   absolutePath: string;
+  /** true if detected by IDE characteristic files, false if detected by existing skills directory */
+  inferred: boolean;
 };
 
 /**

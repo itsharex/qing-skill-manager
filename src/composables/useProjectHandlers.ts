@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { buildProjectCloneTargetPath } from "./constants";
 import { useToast } from "./useToast";
 import { getErrorMessage } from "./utils";
-import type { ProjectConfig, ProjectSkill, LocalSkill, ConflictAnalysis } from "./types";
+import type { ProjectConfig, ProjectSkill, LocalSkill, ConflictAnalysis, ProjectIdeDir } from "./types";
 
 export interface UseProjectHandlersOptions {
   projects: { value: ProjectConfig[] };
@@ -16,7 +16,7 @@ export interface UseProjectHandlersOptions {
   updateProjectIdeTargets: (id: string, ideTargets: string[]) => void;
   updateDetectedIdeDirs: (
     id: string,
-    dirs: Array<{ label: string; relativeDir: string; absolutePath: string }>
+    dirs: ProjectIdeDir[]
   ) => void;
   scanProjectSkills: (
     path: string,
@@ -94,16 +94,47 @@ export function useProjectHandlers(options: UseProjectHandlersOptions) {
           label: string;
           relativeDir: string;
           absolutePath: string;
+          inferred: boolean;
         }>;
       };
 
-      const project = addProject(path, name, []);
+      const autoIdeTargets = scanResult.detectedIdeDirs.map((d) => d.label);
+      const project = addProject(path, name, autoIdeTargets);
       if (project) {
         updateDetectedIdeDirs(project.id, scanResult.detectedIdeDirs);
       }
       closeProjectAddModal();
     } catch (err) {
       console.error("Failed to scan project:", err);
+    }
+  }
+
+  async function rescanAllProjectIdes() {
+    for (const project of projects.value) {
+      try {
+        const scanResult = (await invoke("scan_project_ide_dirs", {
+          request: { projectDir: project.path }
+        })) as {
+          detectedIdeDirs: Array<{
+            label: string;
+            relativeDir: string;
+            absolutePath: string;
+            inferred: boolean;
+          }>;
+        };
+
+        updateDetectedIdeDirs(project.id, scanResult.detectedIdeDirs);
+
+        // Add newly detected IDEs to targets (don't remove existing user choices)
+        const newLabels = scanResult.detectedIdeDirs
+          .map((d) => d.label)
+          .filter((label) => !project.ideTargets.includes(label));
+        if (newLabels.length > 0) {
+          updateProjectIdeTargets(project.id, [...project.ideTargets, ...newLabels]);
+        }
+      } catch (err) {
+        console.error(`Failed to rescan project ${project.name}:`, err);
+      }
     }
   }
 
@@ -308,6 +339,7 @@ export function useProjectHandlers(options: UseProjectHandlersOptions) {
     handleConflictResolution,
     handleImportSelected,
     handleResolveConflictFromImport,
-    handleCloneSkillsToProject
+    handleCloneSkillsToProject,
+    rescanAllProjectIdes
   };
 }

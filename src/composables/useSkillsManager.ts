@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "./useToast";
 import { useIdeConfig } from "./useIdeConfig";
@@ -54,6 +54,9 @@ export function useSkillsManager() {
     searchMarketplace: searchMarketplaceInternal
   } = useMarketplaceSearch(marketConfigs, enabledMarkets, marketStatuses);
 
+  // projectPaths is populated later when useProjectConfig is called; ref is shared
+  const projectPaths = ref<string[]>([]);
+
   const {
     localSkills,
     ideSkills,
@@ -62,7 +65,7 @@ export function useSkillsManager() {
     scanLocalSkills,
     importLocalSkill: importLocalSkillInternal,
     openSkillDirectory: openSkillDirectoryInternal
-  } = useLocalInventory(ideOptions, (msg) => toast.success(msg), (msg) => toast.error(msg), t);
+  } = useLocalInventory(ideOptions, projectPaths, (msg) => toast.success(msg), (msg) => toast.error(msg), t);
 
   const {
     downloadQueue,
@@ -154,6 +157,11 @@ export function useSkillsManager() {
     updateDetectedIdeDirs,
     getProjectLinkTargets
   } = useProjectConfig();
+
+  // Keep projectPaths in sync with projects for scan_overview
+  watch(projects, (ps) => {
+    projectPaths.value = ps.map((p) => p.path);
+  }, { immediate: true, deep: true });
 
   const {
     projectSkillSnapshots,

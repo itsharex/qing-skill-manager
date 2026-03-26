@@ -279,6 +279,7 @@ export default {
     cloneSelected: "克隆选中项 ({count})"
   },
   common: {
+    all: "全部",
     cancel: "取消",
     selectAll: "全选",
     selectAllNew: "选择所有新 Skills",
@@ -474,8 +475,7 @@ export default {
       projects: "项目映射"
     },
     status: {
-      active: "激活",
-      linked: "已链接",
+      used: "已使用",
       unused: "未使用"
     },
     refresh: "刷新",

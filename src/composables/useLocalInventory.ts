@@ -11,6 +11,7 @@ export type TranslateFunction = (key: string, values?: Record<string, string | n
 
 export function useLocalInventory(
   ideOptions: { value: IdeOption[] },
+  projectPaths: { value: string[] },
   onSuccess: ToastFunction,
   onError: ToastFunction,
   t: TranslateFunction
@@ -35,7 +36,7 @@ export function useLocalInventory(
     try {
       const response = await invoke("scan_overview", {
         request: {
-          projectDir: null,
+          projectDirs: projectPaths.value,
           ideDirs: ideOptions.value.map((item) => ({
             label: item.label,
             relativeDir: item.globalDir

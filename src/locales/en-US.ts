@@ -279,6 +279,7 @@ export default {
     cloneSelected: "Clone Selected ({count})"
   },
   common: {
+    all: "All",
     cancel: "Cancel",
     selectAll: "Select All",
     selectAllNew: "Select All New",
@@ -474,8 +475,7 @@ export default {
       projects: "Project Mappings"
     },
     status: {
-      active: "Active",
-      linked: "Linked",
+      used: "Used",
       unused: "Unused"
     },
     refresh: "Refresh",

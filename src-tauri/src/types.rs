@@ -130,7 +130,7 @@ pub struct LocalSkill {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalScanRequest {
-    pub project_dir: Option<String>,
+    pub project_dirs: Vec<String>,
     pub ide_dirs: Vec<IdeDir>,
 }
 
@@ -198,6 +198,8 @@ pub struct ProjectIdeDir {
     pub label: String,
     pub relative_dir: String,
     pub absolute_path: String,
+    /// true if detected by IDE characteristic files, false if detected by existing skills directory
+    pub inferred: bool,
 }
 
 /// Status classification for project-level skill import

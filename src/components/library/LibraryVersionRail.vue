@@ -72,8 +72,6 @@ function isSelected(versionId: string): boolean {
 .library-version-rail {
   display: flex;
   flex-direction: column;
-  width: 280px;
-  min-width: 280px;
   height: 100%;
   padding: 16px;
   border-radius: 0 14px 14px 0;

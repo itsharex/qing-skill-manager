@@ -40,13 +40,9 @@ const allSelected = computed<boolean>(() => {
     && filteredSkills.value.every((skill) => props.selectedIds.includes(skill.id));
 });
 
-function getSkillStatus(skill: LocalSkill): { label: string; type: "active" | "unused" | "linked" } {
+function getSkillStatus(skill: LocalSkill): { label: string; type: "used" | "unused" } {
   if (skill.usedBy.length > 0) {
-    return { label: t("library.status.linked"), type: "linked" };
-  }
-
-  if (skill.currentVersion?.isActive) {
-    return { label: t("library.status.active"), type: "active" };
+    return { label: t("library.status.used"), type: "used" };
   }
 
   return { label: t("library.status.unused"), type: "unused" };
@@ -105,7 +101,7 @@ function handleToggleAll(checked: boolean): void {
         <span class="filter-label">{{ t("library.platformFilter") }}</span>
         <select class="filter-select" :value="platformFilter" @change="$emit('update:platformFilter', ($event.target as HTMLSelectElement).value)">
           <option v-for="option in platformOptions" :key="option.id" :value="option.id">
-            {{ option.id === 'all' ? t('library.platformAll') : option.label }} ({{ option.count }})
+            {{ option.id === 'all' ? t('common.all') : option.label }}
           </option>
         </select>
       </label>
@@ -114,7 +110,7 @@ function handleToggleAll(checked: boolean): void {
         <span class="filter-label">{{ t("library.statusFilter") }}</span>
         <select class="filter-select" :value="statusFilter" @change="$emit('update:statusFilter', ($event.target as HTMLSelectElement).value)">
           <option v-for="option in statusOptions" :key="option.id" :value="option.id">
-            {{ option.id === 'all' ? t('common.all') : t(`library.status.${option.label}`) }} ({{ option.count }})
+            {{ option.id === 'all' ? t('common.all') : t(`library.status.${option.id}`) }}
           </option>
         </select>
       </label>
@@ -163,8 +159,6 @@ function handleToggleAll(checked: boolean): void {
 .library-sidebar {
   display: flex;
   flex-direction: column;
-  width: 400px;
-  min-width: 400px;
   height: 100%;
   padding: 16px;
   border-radius: 14px 0 0 14px;
@@ -384,13 +378,7 @@ function handleToggleAll(checked: boolean): void {
   font-weight: 600;
 }
 
-.status-badge.active {
-  background: var(--color-chip-bg);
-  border: 1px solid var(--color-chip-border);
-  color: var(--color-chip-text, var(--color-text));
-}
-
-.status-badge.linked {
+.status-badge.used {
   background: var(--color-success-bg);
   border: 1px solid var(--color-success-border);
   color: var(--color-success-text);
