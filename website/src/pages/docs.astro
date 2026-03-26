@@ -1,0 +1,388 @@
+---
+import BaseLayout from '@layouts/BaseLayout.astro'
+import ThemeToggle from '@components/ThemeToggle.astro'
+import LanguageSwitch from '@components/LanguageSwitch.astro'
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
+---
+
+<BaseLayout
+  title="Documentation — Qing Skill Manager"
+  description="Complete usage guide for Qing Skill Manager: skill library, marketplace, IDE browser, project management, version control."
+  lang="en"
+>
+  <!-- NAV -->
+  <nav class="sticky top-0 z-50 backdrop-blur-xl bg-background/70 border-b border-border/50">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      <a href={`${BASE}/`} class="flex items-center gap-2 font-semibold text-base sm:text-lg tracking-tight shrink-0">
+        <img src={`${BASE}/favicon-32x32.png`} alt="" class="w-6 h-6 rounded" />
+        <span class="hidden sm:inline">Qing Skill Manager</span>
+        <span class="sm:hidden">QSM</span>
+      </a>
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <a href={`${BASE}/`} class="hidden sm:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">Home</a>
+        <a href={`${BASE}/#download`} class="hidden sm:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">Download</a>
+        <LanguageSwitch lang="en" />
+        <ThemeToggle />
+      </div>
+    </div>
+  </nav>
+
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex gap-8">
+    <!-- SIDEBAR TOC (desktop) -->
+    <aside class="hidden lg:block w-56 shrink-0 sticky top-20 self-start max-h-[calc(100vh-6rem)] overflow-y-auto">
+      <nav class="space-y-1 text-sm">
+        <p class="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-3">Documentation</p>
+        <a href="#overview" class="block py-1.5 text-muted-foreground hover:text-foreground transition-colors">Overview</a>
+        <a href="#skill-library" class="block py-1.5 text-muted-foreground hover:text-foreground transition-colors">Skill Library</a>
+        <a href="#marketplace" class="block py-1.5 text-muted-foreground hover:text-foreground transition-colors">Marketplace</a>
+        <a href="#ide-browser" class="block py-1.5 text-muted-foreground hover:text-foreground transition-colors">IDE Browser</a>
+        <a href="#projects" class="block py-1.5 text-muted-foreground hover:text-foreground transition-colors">Project Management</a>
+        <a href="#versions" class="block py-1.5 text-muted-foreground hover:text-foreground transition-colors">Version Management</a>
+        <a href="#conflicts" class="block py-1.5 text-muted-foreground hover:text-foreground transition-colors">Conflict Resolution</a>
+        <a href="#settings" class="block py-1.5 text-muted-foreground hover:text-foreground transition-colors">Settings</a>
+        <a href="#tips" class="block py-1.5 text-muted-foreground hover:text-foreground transition-colors">Tips &amp; FAQ</a>
+      </nav>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="min-w-0 flex-1">
+      <!-- Mobile TOC -->
+      <details class="lg:hidden mb-8 rounded-xl border border-border/50 bg-card/50 overflow-hidden">
+        <summary class="px-4 py-3 cursor-pointer font-semibold text-sm select-none">Table of Contents</summary>
+        <nav class="px-4 pb-4 space-y-1 text-sm">
+          <a href="#overview" class="block py-1 text-muted-foreground">Overview</a>
+          <a href="#skill-library" class="block py-1 text-muted-foreground">Skill Library</a>
+          <a href="#marketplace" class="block py-1 text-muted-foreground">Marketplace</a>
+          <a href="#ide-browser" class="block py-1 text-muted-foreground">IDE Browser</a>
+          <a href="#projects" class="block py-1 text-muted-foreground">Project Management</a>
+          <a href="#versions" class="block py-1 text-muted-foreground">Version Management</a>
+          <a href="#conflicts" class="block py-1 text-muted-foreground">Conflict Resolution</a>
+          <a href="#settings" class="block py-1 text-muted-foreground">Settings</a>
+          <a href="#tips" class="block py-1 text-muted-foreground">Tips &amp; FAQ</a>
+        </nav>
+      </details>
+
+      <div class="prose prose-neutral dark:prose-invert max-w-none
+        [&_h1]:text-3xl [&_h1]:sm:text-4xl [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:mb-4
+        [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:tracking-tight [&_h2]:mt-16 [&_h2]:mb-6 [&_h2]:pt-8 [&_h2]:border-t [&_h2]:border-border/50
+        [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-8 [&_h3]:mb-3
+        [&_p]:text-[15px] [&_p]:leading-relaxed [&_p]:text-card-foreground [&_p]:mb-4
+        [&_ul]:space-y-1.5 [&_ul]:mb-4 [&_li]:text-[15px] [&_li]:leading-relaxed
+        [&_code]:text-sm [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono
+        [&_strong]:font-semibold
+        [&_img]:rounded-xl [&_img]:border [&_img]:border-border/50 [&_img]:shadow-lg [&_img]:my-6
+        [&_table]:text-sm [&_table]:w-full
+        [&_th]:text-left [&_th]:px-3 [&_th]:py-2 [&_th]:font-semibold [&_th]:border-b [&_th]:border-border/50 [&_th]:bg-muted/50
+        [&_td]:px-3 [&_td]:py-2 [&_td]:border-b [&_td]:border-border/30
+        [&_blockquote]:border-l-4 [&_blockquote]:border-accent [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground
+      ">
+
+        <h1 id="overview">Documentation</h1>
+        <p>Qing Skill Manager helps you manage AI skills across multiple Agent IDEs and projects from a single desktop app. This guide covers every feature.</p>
+
+        <img src={`${BASE}/screenshots/local.jpg`} alt="Skill Library overview" />
+
+        <h3>Core Concepts</h3>
+        <ul>
+          <li><strong>Skill</strong> — An AI agent extension (a directory containing <code>SKILL.md</code> and related files) that augments an IDE's capabilities.</li>
+          <li><strong>Central Repository</strong> — All skills are stored at <code>~/.qing-skill-manager/skills</code>. This is your single source of truth.</li>
+          <li><strong>Install</strong> — Copy a skill from the central repository to an IDE's global skills directory (available to all projects).</li>
+          <li><strong>Clone to Project</strong> — Copy a specific version of a skill into a project's IDE directory (scoped to that project only).</li>
+          <li><strong>Managed vs Unmanaged</strong> — Managed skills are tracked in your repository. Unmanaged skills are found in IDE directories but not tracked — you can "adopt" them into the repository.</li>
+        </ul>
+
+        <h3>App Layout</h3>
+        <p>The app has five main tabs in the top navigation:</p>
+        <table>
+          <thead><tr><th>Tab</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Skill Library</strong></td><td>Three-column workspace for browsing, inspecting, and managing all skills</td></tr>
+            <tr><td><strong>Market</strong></td><td>Search and download skills from public registries</td></tr>
+            <tr><td><strong>IDE Browser</strong></td><td>View and manage skills installed in each IDE</td></tr>
+            <tr><td><strong>Projects</strong></td><td>Register projects, configure IDE targets, deploy skills</td></tr>
+            <tr><td><strong>Settings</strong></td><td>Theme, language, default version strategy</td></tr>
+          </tbody>
+        </table>
+
+        <!-- ==================== SKILL LIBRARY ==================== -->
+        <h2 id="skill-library">Skill Library</h2>
+        <p>The Skill Library is the primary workspace — a three-column layout for managing your entire skill collection.</p>
+
+        <img src={`${BASE}/screenshots/local.jpg`} alt="Skill Library three-column layout" />
+
+        <h3>Left Sidebar</h3>
+        <ul>
+          <li><strong>Search</strong> — Filter skills by name, description, or path.</li>
+          <li><strong>Platform Filter</strong> — Show skills for a specific IDE (All, Claude Code, Cursor, Codex, OpenCode, OpenClaw).</li>
+          <li><strong>Status Tags</strong> — Filter by <code>Managed</code> (in your repo), <code>Unmanaged</code> (found in IDE but not in repo), or <code>Plugin Only</code>.</li>
+          <li><strong>Sort</strong> — By name, version count, or usage.</li>
+          <li><strong>Multi-select</strong> — Check multiple skills for batch operations (install, delete, adopt).</li>
+        </ul>
+
+        <h3>Center Detail Panel</h3>
+        <p>When you select a skill, the center panel shows:</p>
+        <ul>
+          <li>Skill name, description, and source (which marketplace it came from).</li>
+          <li>Repository path on disk.</li>
+          <li><strong>Global Installations</strong> — Which IDEs have this skill installed globally, with version and sync status.</li>
+          <li><strong>Project Deployments</strong> — Which projects use this skill, with per-project version and sync status (Synced / Modified / Conflict).</li>
+          <li>Quick action buttons: <strong>Install to IDE</strong>, <strong>Open Directory</strong>, <strong>Delete</strong>, <strong>Remove from Repo</strong>.</li>
+        </ul>
+
+        <h3>Right Version Rail</h3>
+        <p>The rightmost column displays the version history for the selected skill:</p>
+        <ul>
+          <li>All versions listed chronologically, with the <strong>Default</strong> version marked.</li>
+          <li>Each version shows: display name, creation date, source type, IDE count, project count.</li>
+          <li>Per-version actions: <strong>Rename</strong>, <strong>Delete</strong>, <strong>Compare</strong>, <strong>Set as Default</strong>.</li>
+          <li><strong>Register Version</strong> — Add an external folder as a new version of this skill.</li>
+        </ul>
+
+        <h3>Batch Operations</h3>
+        <p>Use the sidebar checkboxes to select multiple skills, then:</p>
+        <ul>
+          <li><strong>Batch Install to IDE</strong> — Install all selected skills to one or more IDEs at once.</li>
+          <li><strong>Delete Selected</strong> — Remove selected skills from the local repository.</li>
+          <li><strong>Import Local Skill</strong> — Add a local folder (containing <code>SKILL.md</code>) as a new skill in the repository.</li>
+        </ul>
+
+        <!-- ==================== MARKETPLACE ==================== -->
+        <h2 id="marketplace">Marketplace</h2>
+        <p>The Market tab lets you discover and download skills from public registries.</p>
+
+        <img src={`${BASE}/screenshots/market.jpg`} alt="Marketplace search" />
+
+        <h3>Searching</h3>
+        <p>Type a keyword (name, description, or author) in the search bar and click <strong>Search</strong>. Results are aggregated from all enabled marketplaces.</p>
+
+        <h3>Data Sources</h3>
+        <table>
+          <thead><tr><th>Source</th><th>URL</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Claude Plugins</td><td><code>claude-plugins.dev</code></td><td>No key needed</td></tr>
+            <tr><td>SkillsLLM</td><td><code>skillsllm.com</code></td><td>No key needed</td></tr>
+            <tr><td>SkillsMP</td><td><code>skillsmp.com</code></td><td>API key may be required</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Download &amp; Update</h3>
+        <ul>
+          <li>Click <strong>Download</strong> on any skill card to add it to your local repository.</li>
+          <li>If the skill already exists locally, the button shows <strong>Update</strong> instead.</li>
+          <li>Downloads are queued — you can see progress in the download status area.</li>
+          <li>Downloaded skills appear immediately in the Skill Library tab.</li>
+        </ul>
+
+        <h3>Market Settings</h3>
+        <p>Click the gear icon to open Market Settings, where you can:</p>
+        <ul>
+          <li>Enable or disable individual marketplaces.</li>
+          <li>Configure API keys (e.g., for SkillsMP).</li>
+          <li>View connection status for each source.</li>
+        </ul>
+
+        <!-- ==================== IDE BROWSER ==================== -->
+        <h2 id="ide-browser">IDE Browser</h2>
+        <p>The IDE Browser shows what's installed in each IDE on your system.</p>
+
+        <img src={`${BASE}/screenshots/ide.jpg`} alt="IDE Browser" />
+
+        <h3>Switching IDEs</h3>
+        <p>Click any IDE tab at the top to view its installed skills. The count badge shows how many skills are in that IDE.</p>
+
+        <h3>Supported IDEs</h3>
+        <table>
+          <thead><tr><th>IDE</th><th>Global Path</th><th>Project Path</th></tr></thead>
+          <tbody>
+            <tr><td>Claude Code</td><td><code>~/.claude/skills</code></td><td><code>.claude/skills</code></td></tr>
+            <tr><td>Codex</td><td><code>~/.codex/skills</code></td><td><code>.codex/skills</code></td></tr>
+            <tr><td>Cursor</td><td><code>~/.cursor/skills</code></td><td><code>.cursor/skills</code></td></tr>
+            <tr><td>OpenClaw</td><td><code>~/.openclaw/skills</code></td><td><code>.openclaw/skills</code></td></tr>
+            <tr><td>OpenCode</td><td><code>~/.config/opencode/skills</code></td><td><code>.opencode/skills</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3>Skill Actions</h3>
+        <ul>
+          <li><strong>Open Folder</strong> — Reveal the skill directory in your file manager.</li>
+          <li><strong>Uninstall</strong> — Remove the skill from this IDE (deletes the copied directory).</li>
+          <li><strong>Manage Centrally</strong> — "Adopt" an unmanaged skill into your central repository for proper version tracking.</li>
+        </ul>
+
+        <h3>Adding a Custom IDE</h3>
+        <p>If your IDE isn't listed, click <strong>Add IDE</strong> at the top. Provide:</p>
+        <ul>
+          <li><strong>IDE Name</strong> — A display label (e.g., "Windsurf").</li>
+          <li><strong>Skills Path</strong> — The relative or absolute path where this IDE stores skills (e.g., <code>.windsurf/skills</code>).</li>
+        </ul>
+        <p>Your custom IDE then works identically to the built-in ones — install, uninstall, and manage skills from the same interface.</p>
+
+        <h3>Skill Categories</h3>
+        <p>Each skill in the IDE browser is labeled:</p>
+        <ul>
+          <li><strong>Managed Copy</strong> — Installed from your repository; tracked and synced.</li>
+          <li><strong>Local</strong> — Found in the IDE but not in your repository (unmanaged).</li>
+          <li><strong>Built-in Plugin</strong> — System-level plugins shipped with the IDE (toggle visibility with the checkbox).</li>
+        </ul>
+
+        <!-- ==================== PROJECTS ==================== -->
+        <h2 id="projects">Project Management</h2>
+        <p>The Projects tab lets you manage skill deployments per project.</p>
+
+        <img src={`${BASE}/screenshots/project.jpg`} alt="Project management" />
+
+        <h3>Adding a Project</h3>
+        <ol>
+          <li>Click <strong>Add Project</strong>.</li>
+          <li>Select the project directory using the folder picker.</li>
+          <li>The app auto-detects which IDEs the project uses (by looking for <code>.cursor</code>, <code>.claude</code>, etc.).</li>
+        </ol>
+
+        <h3>Configuring IDE Targets</h3>
+        <p>Click <strong>Configure</strong> on a project to choose which IDEs this project targets. Only selected IDEs will receive skills when you deploy.</p>
+
+        <h3>Deploying Skills</h3>
+        <ul>
+          <li>Click <strong>Deploy to Project</strong> to select skills from your library and clone them into the project's IDE directories.</li>
+          <li>You can choose which version to deploy for each skill.</li>
+          <li>The app shows <strong>synced</strong> count and <strong>total skill</strong> count for each project.</li>
+        </ul>
+
+        <h3>Checking Project Skills</h3>
+        <p>Click <strong>Check Project Skills</strong> to scan the project directory and see:</p>
+        <ul>
+          <li><strong>New</strong> — Skills in the project not in your repository.</li>
+          <li><strong>Duplicate</strong> — Exact matches of repository skills.</li>
+          <li><strong>Managed Version</strong> — Matches a specific version in your repository.</li>
+          <li><strong>Conflict</strong> — Same skill name but different content than any known version.</li>
+        </ul>
+
+        <!-- ==================== VERSIONS ==================== -->
+        <h2 id="versions">Version Management</h2>
+        <p>Each skill can have multiple versions. Access the Version Manager from the Skill Library's right rail or the detail panel.</p>
+
+        <h3>Version Properties</h3>
+        <table>
+          <thead><tr><th>Property</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>Display Name</td><td>Human-readable label (e.g., "v2 - concise")</td></tr>
+            <tr><td>Version Number</td><td>Semantic version (e.g., 1.0.0)</td></tr>
+            <tr><td>Content Hash</td><td>SHA hash of the skill contents, used to detect changes</td></tr>
+            <tr><td>Source</td><td>Where this version came from: Market, Project, Import, Clone, or Migration</td></tr>
+            <tr><td>Created At</td><td>Timestamp when this version was registered</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Creating Versions</h3>
+        <ul>
+          <li><strong>From folder</strong> — Point to a local directory containing updated skill files.</li>
+          <li><strong>From project</strong> — Import a modified skill back from a project directory.</li>
+          <li><strong>From marketplace</strong> — Downloading an update automatically creates a new version.</li>
+        </ul>
+
+        <h3>Comparing Versions</h3>
+        <p>Select any two versions and click <strong>Compare</strong> to see:</p>
+        <ul>
+          <li>File-level additions, deletions, and modifications.</li>
+          <li>Metadata changes (name, description, author).</li>
+          <li>Similarity score (percentage match).</li>
+        </ul>
+
+        <h3>Default Version</h3>
+        <p>Each skill has a <strong>default version</strong> — this is the version used when installing to an IDE. You can change it with <strong>Set as Default</strong>.</p>
+
+        <h3>Variants</h3>
+        <p>Variants are named branches of a skill for different use cases (e.g., "verbose" vs. "concise"). Each variant points to a specific version. Create, rename, or delete variants from the Version Manager.</p>
+
+        <h3>Delete Strategies</h3>
+        <p>When deleting a version, choose:</p>
+        <ul>
+          <li><strong>Soft Delete</strong> — Mark as deleted, keep files on disk.</li>
+          <li><strong>Archive</strong> — Move files to an archive directory.</li>
+          <li><strong>Hard Delete</strong> — Permanently remove files from disk.</li>
+        </ul>
+
+        <!-- ==================== CONFLICTS ==================== -->
+        <h2 id="conflicts">Conflict Resolution</h2>
+        <p>When importing skills from a project that already has a different version in your repository, the app detects conflicts automatically.</p>
+
+        <h3>Conflict Types</h3>
+        <table>
+          <thead><tr><th>Type</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Identical</strong></td><td>Content is the same — no conflict.</td></tr>
+            <tr><td><strong>Patch</strong></td><td>Minor differences, likely a small update.</td></tr>
+            <tr><td><strong>Minor</strong></td><td>Moderate differences — some files changed.</td></tr>
+            <tr><td><strong>Major</strong></td><td>Significant differences across many files.</td></tr>
+            <tr><td><strong>Fork</strong></td><td>Content diverged substantially — essentially a different skill.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Resolution Options</h3>
+        <ul>
+          <li><strong>Keep Existing</strong> — Ignore the imported skill, keep your current version.</li>
+          <li><strong>Overwrite</strong> — Replace the existing skill with the imported version.</li>
+          <li><strong>Coexist (Rename)</strong> — Keep both — the imported skill gets a new name so they don't collide.</li>
+        </ul>
+
+        <h3>Conflict Analysis</h3>
+        <p>The app provides an automatic analysis including:</p>
+        <ul>
+          <li>Conflict severity (None / Minor / Major / Breaking).</li>
+          <li>Whether it can be auto-resolved.</li>
+          <li>A suggested resolution with confidence score.</li>
+        </ul>
+
+        <!-- ==================== SETTINGS ==================== -->
+        <h2 id="settings">Settings</h2>
+        <h3>Theme</h3>
+        <p>Choose between <strong>Light</strong>, <strong>Dark</strong>, or <strong>System</strong> (follows your OS preference).</p>
+
+        <h3>Language</h3>
+        <p>Switch between <strong>English</strong> and <strong>Chinese (Simplified)</strong>. The change is instant — no restart needed.</p>
+
+        <h3>Default Version Strategy</h3>
+        <p>Controls which version is used when installing skills to IDEs:</p>
+        <ul>
+          <li><strong>Manual</strong> — You choose the version each time.</li>
+          <li><strong>Latest</strong> — Always use the newest version.</li>
+          <li><strong>Stable</strong> — Use the designated stable version.</li>
+        </ul>
+
+        <!-- ==================== TIPS ==================== -->
+        <h2 id="tips">Tips &amp; FAQ</h2>
+
+        <h3>macOS: "App is damaged" warning</h3>
+        <p>The app is not yet code-signed. Run this in Terminal:</p>
+        <p><code>xattr -dr com.apple.quarantine "/Applications/qing-skill-manager.app"</code></p>
+
+        <h3>Where are my skills stored?</h3>
+        <p>Central repository: <code>~/.qing-skill-manager/skills</code>. Version metadata: <code>~/.qing-skill-manager/versions</code>.</p>
+
+        <h3>Can I manage skills for an IDE that isn't listed?</h3>
+        <p>Yes — go to IDE Browser and click <strong>Add IDE</strong>. Provide a name and the path where that IDE stores skills.</p>
+
+        <h3>How do I move an unmanaged skill into my repository?</h3>
+        <p>In the IDE Browser, click <strong>Manage Centrally</strong> on the skill. This copies it into the central repository and keeps the original in place.</p>
+
+        <h3>Can I pin a specific version to a project?</h3>
+        <p>Yes — when deploying to a project, select which version to clone. The project keeps that version independently of future updates in the repo.</p>
+
+        <h3>What happens when I update a skill from the marketplace?</h3>
+        <p>A new version is created in your repository. Your existing installations and project deployments are <strong>not changed</strong> automatically — you control when to update each location.</p>
+
+      </div>
+    </main>
+  </div>
+
+  <footer class="py-8 px-4 sm:px-6 border-t border-border/30">
+    <div class="max-w-4xl mx-auto text-center text-sm text-muted-foreground">
+      <a href={`${BASE}/`} class="hover:text-foreground transition-colors">Home</a>
+      <span class="mx-2 text-border">|</span>
+      <a href="https://github.com/qing-claw/qing-skill-manager" target="_blank" rel="noopener" class="hover:text-foreground transition-colors">GitHub</a>
+      <span class="mx-2 text-border">|</span>
+      <span>MIT License</span>
+    </div>
+  </footer>
+</BaseLayout>

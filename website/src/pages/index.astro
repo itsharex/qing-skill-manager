@@ -20,9 +20,9 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
         <span class="xs:hidden">QSM</span>
       </a>
       <div class="flex items-center gap-1.5 sm:gap-2">
+        <a href={`${BASE}/docs`} class="hidden sm:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">Docs</a>
         <a href="#features" class="hidden md:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
-        <a href="#screenshots" class="hidden md:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">Screenshots</a>
-        <a href="#download" class="hidden sm:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">Download</a>
+        <a href="#download" class="hidden md:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">Download</a>
         <LanguageSwitch lang="en" />
         <ThemeToggle />
       </div>
@@ -428,6 +428,8 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
           Built on top of <a href="https://github.com/Rito-w/skills-manager" target="_blank" rel="noopener" class="text-foreground font-medium hover:underline">skills-manager</a> by Rito-w. Thanks to all contributors.
         </p>
         <div class="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+          <a href={`${BASE}/docs`} class="hover:text-foreground transition-colors">Docs</a>
+          <span class="text-border">|</span>
           <a href="https://github.com/qing-claw/qing-skill-manager" target="_blank" rel="noopener" class="hover:text-foreground transition-colors">GitHub</a>
           <span class="text-border">|</span>
           <span>MIT License</span>

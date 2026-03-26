@@ -20,9 +20,9 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
         <span class="xs:hidden">QSM</span>
       </a>
       <div class="flex items-center gap-1.5 sm:gap-2">
+        <a href={`${BASE}/zh/docs`} class="hidden sm:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">文档</a>
         <a href="#features" class="hidden md:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">功能</a>
-        <a href="#screenshots" class="hidden md:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">截图</a>
-        <a href="#download" class="hidden sm:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">下载</a>
+        <a href="#download" class="hidden md:inline-block px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">下载</a>
         <LanguageSwitch lang="zh" />
         <ThemeToggle />
       </div>
@@ -428,6 +428,8 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
           基于 Rito-w 的 <a href="https://github.com/Rito-w/skills-manager" target="_blank" rel="noopener" class="text-foreground font-medium hover:underline">skills-manager</a> 继续开发。感谢所有贡献者。
         </p>
         <div class="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+          <a href={`${BASE}/zh/docs`} class="hover:text-foreground transition-colors">文档</a>
+          <span class="hidden sm:inline text-border">|</span>
           <a href="https://github.com/qing-claw/qing-skill-manager" target="_blank" rel="noopener" class="hover:text-foreground transition-colors">GitHub</a>
           <span class="hidden sm:inline text-border">|</span>
           <span>MIT 许可证</span>
