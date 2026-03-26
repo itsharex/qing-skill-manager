@@ -58,6 +58,11 @@ export type IdeSkill = {
   ide: string;
   source: string;
   managed: boolean;
+  scope: "global" | "project" | "plugin";
+  versionId: string | null;
+  contentHash: string | null;
+  installedHash: string | null;
+  syncStatus: "synced" | "modified" | "untracked" | "unknown";
 };
 
 /**
@@ -431,10 +436,12 @@ export type PlatformFilterOption = {
  * Library skill status derived from version and installation state
  */
 export type LibrarySkillStatus =
-  | "installed"      // Installed in at least one IDE
+  | "installed"      // Installed in at least one IDE, all synced
   | "not-installed"  // Only in local repo, not installed anywhere
   | "outdated"       // Has update available
-  | "conflict";      // Has version conflicts
+  | "modified"       // Has locally modified installations
+  | "conflict"       // Has version conflicts
+  | "unmanaged";     // Exists in IDE/project but not in central repo
 
 /**
  * Version summary for Library version stack display
@@ -449,6 +456,7 @@ export type LibraryVersionSummary = {
   source: SkillVersionSource;
   projectCount: number;
   ideCount: number;
+  inRepo: boolean;
 };
 
 /**
@@ -474,6 +482,8 @@ export type LibraryIdeInstallation = {
   skillPath: string;
   versionId: string | null;
   isManaged: boolean;
+  scope: "global" | "project" | "plugin";
+  syncStatus: "synced" | "modified" | "untracked" | "unknown";
 };
 
 /**
@@ -493,6 +503,14 @@ export type LibrarySkill = {
   installations: LibraryIdeInstallation[];
   projectMappings: LibraryProjectMapping[];
   usedByProjectIds: string[];
+  inRepo: boolean;
+  skillScope: "repo" | "global" | "project";
+  displayPath: string;
+  unmanagedSources: Array<{
+    ide: string;
+    scope: "global" | "project";
+    path: string;
+  }>;
 };
 
 /**

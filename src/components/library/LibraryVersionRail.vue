@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import type { LocalSkill, SkillPackage, SkillVersion } from "../../composables/types";
+import type { LibrarySkill, LocalSkill, SkillPackage, SkillVersion } from "../../composables/types";
 
 const { t } = useI18n();
 
 const props = defineProps<{
   skill: LocalSkill | null;
+  librarySkill: LibrarySkill | null;
   selectedVersionId: string | null;
   skillPackage: SkillPackage | null;
   loading: boolean;
@@ -17,6 +18,7 @@ defineEmits<{
   (e: "compareVersions", versionId: string): void;
   (e: "createVersion"): void;
   (e: "setDefault", versionId: string): void;
+  (e: "registerVersion", sourcePath: string): void;
 }>();
 
 const sortedVersions = computed<SkillVersion[]>(() => {
@@ -30,6 +32,70 @@ function isDefault(versionId: string): boolean {
 function isSelected(versionId: string): boolean {
   return versionId === props.selectedVersionId;
 }
+
+function getVersionUsage(versionId: string): { ideCount: number; projectCount: number } {
+  const vs = props.librarySkill?.versions.find((v) => v.id === versionId);
+  return { ideCount: vs?.ideCount ?? 0, projectCount: vs?.projectCount ?? 0 };
+}
+
+function getVersionDeployments(versionId: string) {
+  const installations = props.librarySkill?.installations.filter((i) => i.versionId === versionId) || [];
+  const projects = props.librarySkill?.projectMappings.filter((p) => p.versionId === versionId) || [];
+  return { installations, projects };
+}
+
+function getSyncClass(status: string): string {
+  if (status === "synced" || status === "untracked") return "sync-ok";
+  if (status === "modified") return "sync-warn";
+  return "sync-muted";
+}
+
+function getSyncIcon(status: string): string {
+  if (status === "synced" || status === "untracked") return "\u2713";
+  if (status === "modified") return "\u26a0";
+  return "?";
+}
+
+// Detect unregistered versions: IDE/project copies that don't match any repo version
+const detectedVersions = computed(() => {
+  if (!props.librarySkill) return [];
+  const repoVersionIds = new Set(sortedVersions.value.map((v) => v.id));
+  const results: Array<{ id: string; label: string; scope: string; path: string }> = [];
+  const seen = new Set<string>();
+
+  for (const inst of props.librarySkill.installations) {
+    if (inst.scope === "plugin") continue;
+    if (inst.syncStatus === "modified" || (inst.syncStatus === "unknown" && !inst.versionId)) {
+      const key = `${inst.ideLabel}_${inst.scope}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        results.push({
+          id: `detected_${inst.skillPath}`,
+          label: `${inst.ideLabel} (${inst.scope === "global" ? t("ide.scopeGlobal") : t("ide.scopeProject")})`,
+          scope: inst.scope,
+          path: inst.skillPath
+        });
+      }
+    }
+  }
+
+  for (const pm of props.librarySkill.projectMappings) {
+    if (pm.status === "conflict" || (pm.status === "modified" && pm.versionId && !repoVersionIds.has(pm.versionId))) {
+      const key = `project_${pm.projectId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        results.push({
+          id: `detected_${pm.projectId}`,
+          label: pm.projectName,
+          scope: "project",
+          path: pm.projectPath
+        });
+      }
+    }
+  }
+
+  return results;
+});
 </script>
 
 <template>
@@ -50,7 +116,7 @@ function isSelected(versionId: string): boolean {
       <article v-for="version in sortedVersions" :key="version.id" class="card version-card" :class="{ active: isSelected(version.id), default: isDefault(version.id) }">
         <button class="version-main" @click="$emit('selectVersion', version)">
           <div class="version-header">
-            <div class="card-title">{{ version.displayName }}</div>
+            <div class="card-title"><span class="repo-dot in-repo">●</span> {{ version.displayName }}</div>
             <div class="version-badges">
               <span v-if="isDefault(version.id)" class="badge success">{{ t("library.versions.default") }}</span>
               <span v-if="skill.currentVersion?.id === version.id" class="badge muted">{{ t("library.versions.active") }}</span>
@@ -58,12 +124,43 @@ function isSelected(versionId: string): boolean {
           </div>
           <div class="card-meta">{{ version.version }} · {{ new Date(version.createdAt).toLocaleDateString() }}</div>
           <div class="version-source">{{ version.source }}</div>
+          <div v-if="getVersionUsage(version.id).ideCount > 0 || getVersionUsage(version.id).projectCount > 0" class="version-usage">
+            <span v-if="getVersionUsage(version.id).ideCount > 0" class="usage-tag">{{ t("library.globalIdes", { count: getVersionUsage(version.id).ideCount }) }}</span>
+            <span v-if="getVersionUsage(version.id).projectCount > 0" class="usage-tag">{{ t("library.projectUsage", { count: getVersionUsage(version.id).projectCount }) }}</span>
+          </div>
+          <div v-if="getVersionDeployments(version.id).installations.length > 0 || getVersionDeployments(version.id).projects.length > 0" class="deployment-list">
+            <div v-for="inst in getVersionDeployments(version.id).installations" :key="inst.skillPath" class="deployment-entry">
+              <span class="deploy-name">{{ inst.ideLabel }}</span>
+              <span class="deploy-sync" :class="getSyncClass(inst.syncStatus)">{{ getSyncIcon(inst.syncStatus) }}</span>
+            </div>
+            <div v-for="proj in getVersionDeployments(version.id).projects" :key="proj.projectId" class="deployment-entry">
+              <span class="deploy-name">{{ proj.projectName }}</span>
+              <span class="deploy-sync" :class="getSyncClass(proj.status === 'synced' ? 'synced' : 'modified')">{{ proj.status === "synced" ? "\u2713" : "\u26a0" }}</span>
+            </div>
+          </div>
         </button>
         <div class="version-actions">
           <button v-if="!isDefault(version.id)" class="ghost action-btn" @click="$emit('setDefault', version.id)">{{ t("library.versions.setDefault") }}</button>
           <button v-if="skill.currentVersion?.id !== version.id" class="ghost action-btn" @click="$emit('compareVersions', version.id)">{{ t("library.versions.compare") }}</button>
         </div>
       </article>
+
+      <!-- Detected unregistered versions -->
+      <template v-if="detectedVersions.length > 0">
+        <div class="detected-header">{{ t("library.versions.detected") }}</div>
+        <article v-for="dv in detectedVersions" :key="dv.id" class="card version-card detected">
+          <div class="version-main">
+            <div class="version-header">
+              <div class="card-title"><span class="repo-dot not-in-repo">○</span> {{ dv.label }}</div>
+              <span class="badge muted">{{ t("library.status.unmanaged") }}</span>
+            </div>
+            <div class="card-meta">{{ dv.path }}</div>
+          </div>
+          <div class="version-actions">
+            <button class="ghost action-btn" @click="$emit('registerVersion', dv.path)">{{ t("library.versions.register") }}</button>
+          </div>
+        </article>
+      </template>
     </div>
   </aside>
 </template>
@@ -182,5 +279,68 @@ function isSelected(versionId: string): boolean {
 
 .action-btn {
   padding: 6px 10px;
+}
+
+.version-usage {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.usage-tag {
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  background: var(--color-chip-bg);
+  border: 1px solid var(--color-chip-border);
+  color: var(--color-muted);
+}
+
+.deployment-list {
+  margin-top: 6px;
+  padding-left: 4px;
+  border-left: 2px solid var(--color-card-border);
+}
+
+.deployment-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.deploy-name {
+  color: var(--color-muted);
+}
+
+.deploy-sync {
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.deploy-sync.sync-ok { color: var(--color-success-text); }
+.deploy-sync.sync-warn { color: #d97706; }
+.deploy-sync.sync-muted { color: var(--color-muted); }
+
+.repo-dot {
+  font-size: 10px;
+  margin-right: 4px;
+}
+
+.repo-dot.in-repo { color: var(--color-success-text); }
+.repo-dot.not-in-repo { color: var(--color-muted); }
+
+.detected-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-muted);
+  padding: 12px 0 4px;
+}
+
+.version-card.detected {
+  opacity: 0.8;
+  border-style: dashed;
 }
 </style>

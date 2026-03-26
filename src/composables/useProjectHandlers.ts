@@ -10,7 +10,6 @@ export interface UseProjectHandlersOptions {
   projects: { value: ProjectConfig[] };
   selectedProjectId: { value: string | null };
   localSkills: { value: LocalSkill[] };
-  configuringProject: { value: ProjectConfig | null };
   addProject: (path: string, name: string, ideTargets: string[]) => ProjectConfig | undefined;
   removeProject: (id: string) => void;
   updateProjectIdeTargets: (id: string, ideTargets: string[]) => void;
@@ -36,14 +35,6 @@ export interface UseProjectHandlersOptions {
     resolution: "keep" | "overwrite" | "coexist",
     coexistName?: string
   ) => Promise<boolean>;
-  openProjectAddModal: () => void;
-  closeProjectAddModal: () => void;
-  openProjectConfigModal: (project: ProjectConfig) => void;
-  closeProjectConfigModal: () => void;
-  openProjectExportModal: () => void;
-  closeProjectExportModal: () => void;
-  openProjectImportModal: (project: ProjectConfig) => void;
-  closeProjectImportModal: () => void;
 }
 
 export function useProjectHandlers(options: UseProjectHandlersOptions) {
@@ -53,11 +44,53 @@ export function useProjectHandlers(options: UseProjectHandlersOptions) {
   const localBusy = ref(false);
   const localBusyText = ref("");
 
+  // Modal state (formerly useProjectModals)
+  const showProjectAddModal = ref(false);
+  const showProjectConfigModal = ref(false);
+  const showProjectExportModal = ref(false);
+  const showProjectImportModal = ref(false);
+  const configuringProject = ref<ProjectConfig | null>(null);
+
+  function openProjectAddModal(): void {
+    showProjectAddModal.value = true;
+  }
+
+  function closeProjectAddModal(): void {
+    showProjectAddModal.value = false;
+  }
+
+  function openProjectConfigModal(project: ProjectConfig): void {
+    configuringProject.value = project;
+    showProjectConfigModal.value = true;
+  }
+
+  function closeProjectConfigModal(): void {
+    showProjectConfigModal.value = false;
+    configuringProject.value = null;
+  }
+
+  function openProjectExportModal(): void {
+    showProjectExportModal.value = true;
+  }
+
+  function closeProjectExportModal(): void {
+    showProjectExportModal.value = false;
+  }
+
+  function openProjectImportModal(project: ProjectConfig): void {
+    configuringProject.value = project;
+    showProjectImportModal.value = true;
+  }
+
+  function closeProjectImportModal(): void {
+    showProjectImportModal.value = false;
+    configuringProject.value = null;
+  }
+
   const {
     projects,
     selectedProjectId,
     localSkills,
-    configuringProject,
     addProject,
     removeProject,
     updateProjectIdeTargets,
@@ -68,13 +101,7 @@ export function useProjectHandlers(options: UseProjectHandlersOptions) {
     analyzeConflict,
     openConflictModal,
     closeConflictModal,
-    resolveConflict,
-    closeProjectAddModal,
-    closeProjectConfigModal,
-    openProjectExportModal,
-    closeProjectExportModal,
-    openProjectImportModal,
-    closeProjectImportModal
+    resolveConflict
   } = options;
 
   async function handleRemoveProject(projectId: string) {
@@ -329,6 +356,19 @@ export function useProjectHandlers(options: UseProjectHandlersOptions) {
   return {
     localBusy,
     localBusyText,
+    showProjectAddModal,
+    showProjectConfigModal,
+    showProjectExportModal,
+    showProjectImportModal,
+    configuringProject,
+    openProjectAddModal,
+    closeProjectAddModal,
+    openProjectConfigModal,
+    closeProjectConfigModal,
+    openProjectExportModal,
+    closeProjectExportModal,
+    openProjectImportModal,
+    closeProjectImportModal,
     handleRemoveProject,
     handleSelectProject,
     handleProjectAddConfirm,

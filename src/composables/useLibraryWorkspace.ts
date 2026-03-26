@@ -73,7 +73,7 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
   // ============================================================================
 
   const librarySkills = computed<LibrarySkill[]>(() => {
-    return localSkills.value.map((localSkill): LibrarySkill => {
+    const repoSkills = localSkills.value.map((localSkill): LibrarySkill => {
       // Build version summaries from currentSkillPackage if available
       const versions: LibraryVersionSummary[] = buildVersionSummaries(localSkill);
 
@@ -86,10 +86,19 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
       // Build project mappings
       const projectMappings = buildProjectMappings(localSkill, projects.value, projectSkillSnapshots.value);
 
+      // Populate version usage counts from installations and project mappings
+      for (const vs of versions) {
+        vs.ideCount = installations.filter((inst) => inst.versionId === vs.id).length;
+        vs.projectCount = projectMappings.filter((pm) => pm.versionId === vs.id).length;
+      }
+
       // Get projects using this skill
       const usedByProjectIds = projectMappings
         .filter((pm) => pm.versionId !== null)
         .map((pm) => pm.projectId);
+
+      // Display path: prefer project/IDE path over repo path
+      const displayPath = installations[0]?.skillPath || localSkill.path;
 
       return {
         id: localSkill.id,
@@ -104,9 +113,57 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
         versions,
         installations,
         projectMappings,
-        usedByProjectIds
+        usedByProjectIds,
+        inRepo: true,
+        skillScope: "repo" as const,
+        displayPath,
+        unmanagedSources: []
       };
     });
+
+    // Add unmanaged IDE skills not in central repo
+    const managedNames = new Set(repoSkills.map((s) => s.name));
+    const unmanagedMap = new Map<string, LibrarySkill>();
+
+    for (const ideSkill of ideSkills.value) {
+      if (ideSkill.managed || managedNames.has(ideSkill.name) || ideSkill.scope === "plugin") {
+        continue;
+      }
+      const existing = unmanagedMap.get(ideSkill.name);
+      if (existing) {
+        existing.unmanagedSources.push({
+          ide: ideSkill.ide,
+          scope: ideSkill.scope as "global" | "project",
+          path: ideSkill.path
+        });
+      } else {
+        const scope = ideSkill.scope as "global" | "project";
+        unmanagedMap.set(ideSkill.name, {
+          id: `unmanaged_${ideSkill.id}`,
+          name: ideSkill.name,
+          description: "",
+          source: ideSkill.source,
+          path: ideSkill.path,
+          status: "unmanaged",
+          versionCount: 0,
+          defaultVersion: null,
+          versions: [],
+          installations: [],
+          projectMappings: [],
+          usedByProjectIds: [],
+          inRepo: false,
+          skillScope: scope,
+          displayPath: ideSkill.path,
+          unmanagedSources: [{
+            ide: ideSkill.ide,
+            scope,
+            path: ideSkill.path
+          }]
+        });
+      }
+    }
+
+    return [...repoSkills, ...unmanagedMap.values()];
   });
 
   // ============================================================================
@@ -191,8 +248,9 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
         isDefault: version.id === currentSkillPackage.value!.defaultVersion,
         isActive: version.isActive,
         source: version.source,
-        projectCount: 0, // Will be computed from project mappings
-        ideCount: 0      // Will be computed from installations
+        projectCount: 0,
+        ideCount: 0,
+        inRepo: true
       }));
     }
 
@@ -207,7 +265,8 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
         isActive: localSkill.currentVersion.isActive,
         source: localSkill.currentVersion.source,
         projectCount: 0,
-        ideCount: 0
+        ideCount: 0,
+        inRepo: true
       }];
     }
 
@@ -218,18 +277,23 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
     localSkill: LocalSkill,
     allIdeSkills: IdeSkill[]
   ): LibrarySkillStatus {
-    const managedIdeSkills = allIdeSkills.filter(
-      (ideSkill) => ideSkill.name === localSkill.name && ideSkill.managed
+    const relatedIdeSkills = allIdeSkills.filter(
+      (ideSkill) => ideSkill.name === localSkill.name
     );
+    const managedIdeSkills = relatedIdeSkills.filter((s) => s.managed);
 
     if (managedIdeSkills.length === 0) {
       return "not-installed";
     }
 
-    // Check for conflicts: if the skill has unmanaged copies in IDEs with the same name
-    const unmanagedCopies = allIdeSkills.filter(
-      (ideSkill) => ideSkill.name === localSkill.name && !ideSkill.managed
-    );
+    // Check for modifications (any managed installation locally modified)
+    const hasModified = managedIdeSkills.some((s) => s.syncStatus === "modified");
+    if (hasModified) {
+      return "modified";
+    }
+
+    // Check for conflicts: unmanaged copies with same name
+    const unmanagedCopies = relatedIdeSkills.filter((s) => !s.managed);
     if (unmanagedCopies.length > 0) {
       return "conflict";
     }
@@ -239,14 +303,12 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
       const pkg = currentSkillPackage.value;
       const defaultVersion = pkg.versions.find((v) => v.id === pkg.defaultVersion);
       if (defaultVersion && localSkill.currentVersion) {
-        // If the active version differs from the default, consider it outdated
         if (localSkill.currentVersion.id !== defaultVersion.id && !localSkill.currentVersion.isActive) {
           return "outdated";
         }
       }
-      // Check if any version has a newer source URL (market update available)
       if (pkg.versions.length > 1 && defaultVersion) {
-        const latestVersion = pkg.versions[0]; // versions sorted by creation time desc
+        const latestVersion = pkg.versions[0];
         if (latestVersion.id !== defaultVersion.id && latestVersion.source === "market") {
           return "outdated";
         }
@@ -270,8 +332,10 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
           ideId: ideSkill.ide,
           ideLabel: ideOption?.label || ideSkill.ide,
           skillPath: ideSkill.path,
-          versionId: null, // Would need version detection
-          isManaged: ideSkill.managed
+          versionId: ideSkill.versionId,
+          isManaged: ideSkill.managed,
+          scope: ideSkill.scope,
+          syncStatus: ideSkill.syncStatus
         });
       }
     }
@@ -304,7 +368,7 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
       const isDefaultVersion = matchingSkill.matchesDefaultVersion ?? false;
       const status: LibraryProjectMapping["status"] =
         matchingSkill.status === "conflict" ? "conflict" :
-        matchingSkill.status === "managed_version" ? "synced" :
+        matchingSkill.status === "duplicate" || matchingSkill.status === "managed_version" ? "synced" :
         "modified";
 
       return {

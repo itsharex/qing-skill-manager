@@ -33,7 +33,7 @@ export function useProjectScan(
 
     try {
       const installBaseDir = await buildInstallBaseDir();
-      const result = await invoke("scan_project_opencode_skills", {
+      const result = await invoke("scan_project_skills", {
         request: {
           projectDir: projectPath,
           managerRoot: installBaseDir

@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   SkillPackage,
   SkillDiff,
+  SkillVersion,
+  ProjectSkill,
   ConflictAnalysis,
   CreateVersionRequest,
   CreateVersionResponse,
@@ -40,6 +42,16 @@ export function useVersionManagement(
   const currentVersionDiff = ref<SkillDiff | null>(null);
   const busy = ref(false);
   const busyText = ref("");
+
+  // Version comparison & import state (formerly useVersionManagementState)
+  const comparingFromVersion = ref<SkillVersion | null>(null);
+  const comparingToVersion = ref<SkillVersion | null>(null);
+  const currentDiff = ref<SkillDiff | null>(null);
+  const currentManagedSkillPath = ref("");
+  const selectedCreateVersionSourcePath = ref("");
+  const versionImportProjectId = ref<string | null>(null);
+  const versionImportProjectSkills = ref<ProjectSkill[]>([]);
+  const versionImportProjectSkillsLoading = ref(false);
 
   async function loadSkillPackage(skillId: string): Promise<SkillPackage | null> {
     versionLoading.value = true;
@@ -247,6 +259,18 @@ export function useVersionManagement(
     currentVersionDiff.value = null;
   }
 
+  function setComparisonVersions(from: SkillVersion | null, to: SkillVersion | null, diff: SkillDiff | null): void {
+    comparingFromVersion.value = from;
+    comparingToVersion.value = to;
+    currentDiff.value = diff;
+  }
+
+  function setVersionImportProject(projectId: string | null, skills: ProjectSkill[] = [], loading = false): void {
+    versionImportProjectId.value = projectId;
+    versionImportProjectSkills.value = skills;
+    versionImportProjectSkillsLoading.value = loading;
+  }
+
   return {
     currentSkillPackage,
     showVersionManagerModal,
@@ -269,6 +293,16 @@ export function useVersionManagement(
     openVersionManagerModal,
     closeVersionManagerModal,
     openVersionDiffModal,
-    closeVersionDiffModal
+    closeVersionDiffModal,
+    comparingFromVersion,
+    comparingToVersion,
+    currentDiff,
+    currentManagedSkillPath,
+    selectedCreateVersionSourcePath,
+    versionImportProjectId,
+    versionImportProjectSkills,
+    versionImportProjectSkillsLoading,
+    setComparisonVersions,
+    setVersionImportProject
   };
 }

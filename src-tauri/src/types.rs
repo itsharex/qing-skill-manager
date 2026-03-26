@@ -143,6 +143,11 @@ pub struct IdeSkill {
     pub ide: String,
     pub source: String,
     pub managed: bool,
+    pub scope: String,
+    pub version_id: Option<String>,
+    pub content_hash: Option<String>,
+    pub installed_hash: Option<String>,
+    pub sync_status: String,
 }
 
 #[derive(Serialize, Debug)]

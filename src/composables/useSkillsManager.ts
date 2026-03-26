@@ -144,7 +144,17 @@ export function useSkillsManager() {
     openVersionManagerModal,
     closeVersionManagerModal,
     openVersionDiffModal,
-    closeVersionDiffModal
+    closeVersionDiffModal,
+    comparingFromVersion,
+    comparingToVersion,
+    currentDiff,
+    currentManagedSkillPath,
+    selectedCreateVersionSourcePath,
+    versionImportProjectId,
+    versionImportProjectSkills,
+    versionImportProjectSkillsLoading,
+    setComparisonVersions,
+    setVersionImportProject
   } = useVersionManagement((msg) => toast.success(msg), (msg) => toast.error(msg), scanLocalSkills, t);
 
   const {
@@ -329,6 +339,16 @@ export function useSkillsManager() {
     closeVersionManagerModal,
     openVersionDiffModal,
     closeVersionDiffModal,
+    comparingFromVersion,
+    comparingToVersion,
+    currentDiff,
+    currentManagedSkillPath,
+    selectedCreateVersionSourcePath,
+    versionImportProjectId,
+    versionImportProjectSkills,
+    versionImportProjectSkillsLoading,
+    setComparisonVersions,
+    setVersionImportProject,
     projects,
     selectedProjectId,
     loadProjects,

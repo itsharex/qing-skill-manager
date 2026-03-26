@@ -30,6 +30,7 @@ const emit = defineEmits<{
 }>();
 
 const selectedIds = ref<string[]>([]);
+const showPlugin = ref(false);
 
 watch(
   () => props.filteredIdeSkills,
@@ -40,8 +41,19 @@ watch(
   { deep: true }
 );
 
+const visibleSkills = computed(() =>
+  showPlugin.value
+    ? props.filteredIdeSkills
+    : props.filteredIdeSkills.filter((skill) => skill.scope !== "plugin")
+);
+
+const globalSkills = computed(() => visibleSkills.value.filter((skill) => skill.scope === "global"));
+const projectSkills = computed(() => visibleSkills.value.filter((skill) => skill.scope === "project"));
+const pluginSkills = computed(() => visibleSkills.value.filter((skill) => skill.scope === "plugin"));
+const pluginCount = computed(() => props.filteredIdeSkills.filter((skill) => skill.scope === "plugin").length);
+
 const selectedSkills = computed(() =>
-  props.filteredIdeSkills.filter((skill) => selectedIds.value.includes(skill.id))
+  visibleSkills.value.filter((skill) => selectedIds.value.includes(skill.id))
 );
 
 const selectedUnmanagedSkills = computed(() =>
@@ -50,8 +62,8 @@ const selectedUnmanagedSkills = computed(() =>
 
 const allSelected = computed(
   () =>
-    props.filteredIdeSkills.length > 0 &&
-    props.filteredIdeSkills.every((skill) => selectedIds.value.includes(skill.id))
+    visibleSkills.value.length > 0 &&
+    visibleSkills.value.filter((skill) => skill.scope !== "plugin").every((skill) => selectedIds.value.includes(skill.id))
 );
 
 function toggleSelectAll(checked: boolean) {
@@ -83,18 +95,6 @@ function adoptSelected() {
 <template>
   <section class="panel">
     <div class="panel-title">{{ t("ide.title") }}</div>
-    <div class="panel-summary">
-      <span>{{ t("ide.total", { count: filteredIdeSkills.length }) }}</span>
-      <label class="checkbox select-all">
-        <input
-          type="checkbox"
-          :checked="allSelected"
-          :disabled="filteredIdeSkills.length === 0"
-          @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
-        />
-        {{ t("ide.selectAll") }}
-      </label>
-    </div>
     <div class="hint">{{ t("ide.switchHint") }}</div>
     <div class="ide-filter-grid">
       <button
@@ -130,6 +130,13 @@ function adoptSelected() {
       </div>
     </div>
 
+    <div class="scope-toggle">
+      <label class="checkbox">
+        <input type="checkbox" v-model="showPlugin" />
+        {{ t("ide.showPlugin", { count: pluginCount }) }}
+      </label>
+    </div>
+
     <div class="actions">
       <div class="buttons">
         <button
@@ -150,49 +157,94 @@ function adoptSelected() {
     </div>
 
     <div v-if="localLoading" class="hint">{{ t("ide.loading") }}</div>
-    <div v-if="!localLoading && filteredIdeSkills.length === 0" class="hint">{{ t("ide.emptyHint") }}</div>
-    <div v-if="filteredIdeSkills.length > 0" class="cards">
-      <article
-        v-for="(skill, index) in filteredIdeSkills"
-        :key="skill.id"
-        class="card"
-        :class="{ unmanaged: !skill.managed }"
-      >
-        <div class="card-header">
-          <div class="card-title-row">
-            <label class="checkbox card-select">
-              <input
-                type="checkbox"
-                :checked="selectedIds.includes(skill.id)"
-                @change="toggleSelected(skill.id, ($event.target as HTMLInputElement).checked)"
-              />
-            </label>
-            <div>
-              <div class="card-title">{{ index + 1 }}. {{ skill.name }}</div>
-              <div class="card-meta">
-                {{
-                  skill.ide +
-                  " · " +
-                  (skill.source === "managed" ? t("ide.sourceManaged") : t("ide.sourceLocal")) +
-                  (!skill.managed ? ` · ${t("ide.unmanaged")}` : "")
-                }}
+    <div v-if="!localLoading && visibleSkills.length === 0" class="hint">{{ t("ide.emptyHint") }}</div>
+
+    <div v-if="visibleSkills.length > 0" class="skill-list-header">
+      <span class="skill-list-count">{{ t("ide.total", { count: visibleSkills.length }) }}</span>
+      <label class="checkbox select-all">
+        <input
+          type="checkbox"
+          :checked="allSelected"
+          :disabled="globalSkills.length + projectSkills.length === 0"
+          @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
+        />
+        {{ t("ide.selectAll") }}
+      </label>
+    </div>
+
+    <div v-if="visibleSkills.length > 0" class="skill-groups">
+      <!-- Global Skills -->
+      <div v-if="globalSkills.length > 0" class="skill-group">
+        <div class="group-header">{{ t("ide.scopeGlobal") }} <span class="group-count">{{ globalSkills.length }}</span></div>
+        <div class="cards">
+          <article v-for="skill in globalSkills" :key="skill.id" class="card" :class="{ unmanaged: !skill.managed }">
+            <div class="card-header">
+              <div class="card-title-row">
+                <label class="checkbox card-select">
+                  <input type="checkbox" :checked="selectedIds.includes(skill.id)" @change="toggleSelected(skill.id, ($event.target as HTMLInputElement).checked)" />
+                </label>
+                <div>
+                  <div class="card-title">{{ skill.name }}</div>
+                  <div class="card-meta">{{ skill.source === "managed" ? t("ide.sourceManaged") : t("ide.sourceLocal") }}{{ !skill.managed ? ` · ${t("ide.unmanaged")}` : "" }}</div>
+                </div>
+              </div>
+              <div class="card-actions">
+                <button class="ghost" @click="$emit('openDir', skill.path)">{{ t("ide.openDir") }}</button>
+                <button v-if="!skill.managed" class="ghost" @click="$emit('adopt', skill)">{{ t("ide.adopt") }}</button>
+                <button class="ghost" @click="$emit('uninstall', skill.path)">{{ t("ide.uninstall") }}</button>
               </div>
             </div>
-          </div>
-          <div class="card-actions">
-            <button class="ghost" @click="$emit('openDir', skill.path)">{{ t("ide.openDir") }}</button>
-            <button
-              v-if="!skill.managed"
-              class="ghost"
-              @click="$emit('adopt', skill)"
-            >
-              {{ t("ide.adopt") }}
-            </button>
-            <button class="ghost" @click="$emit('uninstall', skill.path)">{{ t("ide.uninstall") }}</button>
-          </div>
+            <div class="card-link">{{ skill.path }}</div>
+          </article>
         </div>
-        <div class="card-link">{{ skill.path }}</div>
-      </article>
+      </div>
+
+      <!-- Project Skills -->
+      <div v-if="projectSkills.length > 0" class="skill-group">
+        <div class="group-header">{{ t("ide.scopeProject") }} <span class="group-count">{{ projectSkills.length }}</span></div>
+        <div class="cards">
+          <article v-for="skill in projectSkills" :key="skill.id" class="card" :class="{ unmanaged: !skill.managed }">
+            <div class="card-header">
+              <div class="card-title-row">
+                <label class="checkbox card-select">
+                  <input type="checkbox" :checked="selectedIds.includes(skill.id)" @change="toggleSelected(skill.id, ($event.target as HTMLInputElement).checked)" />
+                </label>
+                <div>
+                  <div class="card-title">{{ skill.name }}</div>
+                  <div class="card-meta">{{ skill.source === "managed" ? t("ide.sourceManaged") : t("ide.sourceLocal") }}{{ !skill.managed ? ` · ${t("ide.unmanaged")}` : "" }}</div>
+                </div>
+              </div>
+              <div class="card-actions">
+                <button class="ghost" @click="$emit('openDir', skill.path)">{{ t("ide.openDir") }}</button>
+                <button v-if="!skill.managed" class="ghost" @click="$emit('adopt', skill)">{{ t("ide.adopt") }}</button>
+                <button class="ghost" @click="$emit('uninstall', skill.path)">{{ t("ide.uninstall") }}</button>
+              </div>
+            </div>
+            <div class="card-link">{{ skill.path }}</div>
+          </article>
+        </div>
+      </div>
+
+      <!-- Plugin Skills -->
+      <div v-if="pluginSkills.length > 0" class="skill-group">
+        <div class="group-header">{{ t("ide.scopePlugin") }} <span class="group-count">{{ pluginSkills.length }}</span></div>
+        <div class="cards">
+          <article v-for="skill in pluginSkills" :key="skill.id" class="card plugin">
+            <div class="card-header">
+              <div class="card-title-row">
+                <div>
+                  <div class="card-title">{{ skill.name }}</div>
+                  <div class="card-meta"><span class="plugin-badge">{{ t("ide.sourcePlugin") }}</span></div>
+                </div>
+              </div>
+              <div class="card-actions">
+                <button class="ghost" @click="$emit('openDir', skill.path)">{{ t("ide.openDir") }}</button>
+              </div>
+            </div>
+            <div class="card-link">{{ skill.path }}</div>
+          </article>
+        </div>
+      </div>
     </div>
   </section>
 </template>
@@ -223,6 +275,20 @@ function adoptSelected() {
 .card.unmanaged {
   border-color: rgba(245, 158, 11, 0.35);
   box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.22);
+}
+
+.card.plugin {
+  opacity: 0.7;
+  border-color: var(--color-card-border);
+}
+
+.plugin-badge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--color-chip-bg);
+  border: 1px solid var(--color-chip-border);
 }
 
 .card-actions {
@@ -266,5 +332,53 @@ function adoptSelected() {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
+}
+
+.skill-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.skill-list-count {
+  font-weight: 600;
+}
+
+.scope-toggle {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.skill-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skill-group {
+  margin-top: 8px;
+}
+
+.group-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-muted);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.group-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: var(--color-chip-bg);
+  border: 1px solid var(--color-chip-border);
 }
 </style>

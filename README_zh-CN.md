@@ -32,18 +32,11 @@ Qing Skill Manager 基于原始项目 [skills-manager](https://github.com/Rito-w
 
 ## 🎯 原生支持的 IDE（按字母顺序）
 
-- **Antigravity**: `.gemini/antigravity/skills`
 - **Claude Code**: `.claude/skills`
-- **CodeBuddy**: `.codebuddy/skills`
 - **Codex**: `.codex/skills`
 - **Cursor**: `.cursor/skills`
-- **Kiro**: `.kiro/skills`
 - **OpenClaw**: `.openclaw/skills`
-- **OpenCode**: `.config/opencode/skills`
-- **Qoder**: `.qoder/skills`
-- **Trae**: `.trae/skills`
-- **VSCode**: `.github/skills`
-- **Windsurf**: `.windsurf/skills`
+- **OpenCode**: `.config/opencode/skills`（项目级: `.opencode/skills`）
 
 ## 📖 使用指南
 

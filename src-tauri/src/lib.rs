@@ -8,7 +8,7 @@ use commands::skills::{
     adopt_ide_skill, analyze_skill_conflict, clone_local_skill, create_skill_variant, create_skill_version, delete_local_skills,
     delete_skill_variant, delete_skill_version, get_skill_package, import_local_skill,
     list_skill_packages, rename_skill_version, resolve_skill_conflict,
-    scan_overview, scan_project_ide_dirs, scan_project_opencode_skills, compare_skill_versions,
+    scan_overview, scan_project_ide_dirs, scan_project_opencode_skills, scan_project_skills, compare_skill_versions,
     set_default_skill_version, uninstall_skill, update_skill_variant, get_app_config, save_app_config,
 };
 
@@ -45,6 +45,7 @@ pub fn run() {
             adopt_ide_skill,
             scan_project_ide_dirs,
             scan_project_opencode_skills,
+            scan_project_skills,
             resolve_skill_conflict,
             analyze_skill_conflict,
             create_skill_version,

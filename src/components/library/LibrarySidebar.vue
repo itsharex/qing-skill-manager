@@ -16,6 +16,9 @@ const props = defineProps<{
   statusFilter: string;
   platformOptions: Array<{ id: string; label: string; count: number }>;
   statusOptions: Array<{ id: string; label: string; count: number }>;
+  projectUsageMap: Map<string, string[]>;
+  skillStatusMap: Map<string, string>;
+  skillScopeMap: Map<string, string>;
 }>();
 
 const emit = defineEmits<{
@@ -35,21 +38,50 @@ const emit = defineEmits<{
 
 const filteredSkills = computed<LocalSkill[]>(() => props.skills);
 
+const repoSkills = computed(() => filteredSkills.value.filter((s) => {
+  const scope = props.skillScopeMap.get(s.id);
+  return scope === "repo";
+}));
+
+const globalSkills = computed(() => filteredSkills.value.filter((s) => {
+  const scope = props.skillScopeMap.get(s.id);
+  return scope === "global";
+}));
+
+const projectSkills = computed(() => filteredSkills.value.filter((s) => {
+  const scope = props.skillScopeMap.get(s.id);
+  return scope === "project";
+}));
+
 const allSelected = computed<boolean>(() => {
   return filteredSkills.value.length > 0
     && filteredSkills.value.every((skill) => props.selectedIds.includes(skill.id));
 });
 
-function getSkillStatus(skill: LocalSkill): { label: string; type: "used" | "unused" } {
-  if (skill.usedBy.length > 0) {
+function getSkillStatus(skill: LocalSkill): { label: string; type: "used" | "unused" | "modified" | "unmanaged" } {
+  const status = props.skillStatusMap.get(skill.id);
+  if (status === "unmanaged") {
+    return { label: t("library.status.unmanaged"), type: "unmanaged" };
+  }
+  if (status === "modified") {
+    return { label: t("library.status.modified"), type: "modified" };
+  }
+
+  const projectIds = props.projectUsageMap.get(skill.id);
+  if (skill.usedBy.length > 0 || (projectIds && projectIds.length > 0)) {
     return { label: t("library.status.used"), type: "used" };
   }
 
   return { label: t("library.status.unused"), type: "unused" };
 }
 
+
 function getLinkedIdeCount(skill: LocalSkill): number {
   return skill.usedBy.length;
+}
+
+function getProjectCount(skill: LocalSkill): number {
+  return props.projectUsageMap.get(skill.id)?.length ?? 0;
 }
 
 function handleToggleAll(checked: boolean): void {
@@ -131,26 +163,62 @@ function handleToggleAll(checked: boolean): void {
         <span>{{ t("library.empty.listNoResults") }}</span>
       </div>
 
-      <article v-for="skill in filteredSkills" :key="skill.id" class="card skill-card" :class="{ active: selectedSkillId === skill.id, linked: skill.usedBy.length > 0 }">
-        <div class="skill-card-top">
-          <label class="checkbox card-select" @click.stop>
-            <input type="checkbox" :checked="selectedIds.includes(skill.id)" @change="$emit('toggleSelected', skill.id, ($event.target as HTMLInputElement).checked)" />
-          </label>
+      <template v-if="repoSkills.length > 0">
+        <div class="group-header">{{ t("library.groupRepo") }} <span class="group-count">{{ repoSkills.length }}</span></div>
+        <article v-for="skill in repoSkills" :key="skill.id" class="card skill-card" :class="{ active: selectedSkillId === skill.id, linked: getSkillStatus(skill).type === 'used' }">
+          <div class="skill-card-top">
+            <label class="checkbox card-select" @click.stop>
+              <input type="checkbox" :checked="selectedIds.includes(skill.id)" @change="$emit('toggleSelected', skill.id, ($event.target as HTMLInputElement).checked)" />
+            </label>
+            <span class="repo-indicator in-repo" :title="t('library.inRepo')">●</span>
+            <button class="skill-main" @click="$emit('select', skill)">
+              <div class="skill-item-header">
+                <span class="skill-name">{{ skill.name }}</span>
+                <span class="status-badge" :class="getSkillStatus(skill).type">{{ getSkillStatus(skill).label }}</span>
+              </div>
+              <div class="card-meta skill-description-line">{{ skill.description || skill.path }}</div>
+              <div class="skill-meta">
+                <span v-if="skill.currentVersion" class="version-chip">{{ skill.currentVersion.displayName }}</span>
+                <span class="version-meta-text">{{ t("version.totalVersions") }}: {{ skill.versionCount }}</span>
+                <span v-if="getLinkedIdeCount(skill) > 0" class="ide-count global">{{ t("library.globalIdes", { count: getLinkedIdeCount(skill) }) }}</span>
+                <span v-if="getProjectCount(skill) > 0" class="ide-count project">{{ t("library.projectUsage", { count: getProjectCount(skill) }) }}</span>
+              </div>
+            </button>
+          </div>
+        </article>
+      </template>
 
-          <button class="skill-main" @click="$emit('select', skill)">
-            <div class="skill-item-header">
-              <span class="skill-name">{{ skill.name }}</span>
-              <span class="status-badge" :class="getSkillStatus(skill).type">{{ getSkillStatus(skill).label }}</span>
-            </div>
-            <div class="card-meta skill-description-line">{{ skill.description || skill.path }}</div>
-            <div class="skill-meta">
-              <span v-if="skill.currentVersion" class="version-chip">{{ skill.currentVersion.displayName }}</span>
-              <span class="version-meta-text">{{ t("version.totalVersions") }}: {{ skill.versionCount }}</span>
-              <span v-if="getLinkedIdeCount(skill) > 0" class="ide-count">{{ t("library.linkedIdes", { count: getLinkedIdeCount(skill) }) }}</span>
-            </div>
-          </button>
-        </div>
-      </article>
+      <template v-if="globalSkills.length > 0">
+        <div class="group-header">{{ t("library.groupGlobal") }} <span class="group-count">{{ globalSkills.length }}</span></div>
+        <article v-for="skill in globalSkills" :key="skill.id" class="card skill-card unmanaged" :class="{ active: selectedSkillId === skill.id }">
+          <div class="skill-card-top">
+            <span class="repo-indicator not-in-repo" :title="t('library.notInRepo')">○</span>
+            <button class="skill-main" @click="$emit('select', skill)">
+              <div class="skill-item-header">
+                <span class="skill-name">{{ skill.name }}</span>
+                <span class="status-badge unmanaged">{{ t("library.status.unmanaged") }}</span>
+              </div>
+              <div class="card-meta skill-description-line">{{ skill.path }}</div>
+            </button>
+          </div>
+        </article>
+      </template>
+
+      <template v-if="projectSkills.length > 0">
+        <div class="group-header">{{ t("library.groupProject") }} <span class="group-count">{{ projectSkills.length }}</span></div>
+        <article v-for="skill in projectSkills" :key="skill.id" class="card skill-card unmanaged" :class="{ active: selectedSkillId === skill.id }">
+          <div class="skill-card-top">
+            <span class="repo-indicator not-in-repo" :title="t('library.notInRepo')">○</span>
+            <button class="skill-main" @click="$emit('select', skill)">
+              <div class="skill-item-header">
+                <span class="skill-name">{{ skill.name }}</span>
+                <span class="status-badge unmanaged">{{ t("library.status.unmanaged") }}</span>
+              </div>
+              <div class="card-meta skill-description-line">{{ skill.path }}</div>
+            </button>
+          </div>
+        </article>
+      </template>
     </div>
   </aside>
 </template>
@@ -388,6 +456,57 @@ function handleToggleAll(checked: boolean): void {
   background: var(--color-card-bg);
   border: 1px solid var(--color-card-border);
   color: var(--color-muted);
+}
+
+.status-badge.modified {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #d97706;
+}
+
+.status-badge.unmanaged {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.skill-card.unmanaged {
+  opacity: 0.85;
+}
+
+.repo-indicator {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+  padding-top: 4px;
+}
+
+.repo-indicator.in-repo {
+  color: var(--color-success-text);
+}
+
+.repo-indicator.not-in-repo {
+  color: var(--color-muted);
+}
+
+.group-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-muted);
+  padding: 10px 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.group-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  background: var(--color-chip-bg);
+  border: 1px solid var(--color-chip-border);
+  font-weight: 500;
 }
 
 .skill-meta {

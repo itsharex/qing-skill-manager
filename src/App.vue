@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "vue-i18n";
 import { useSkillsManager } from "./composables/useSkillsManager";
-import { useProjectConfig } from "./composables/useProjectConfig";
 import { usePreferences } from "./composables/usePreferences";
-import { useProjectSnapshots } from "./composables/useProjectSnapshots";
-import { useVersionManagementState } from "./composables/useVersionManagementState";
-import { useProjectModals } from "./composables/useProjectModals";
 import { useProjectHandlers } from "./composables/useProjectHandlers";
 import MarketPanel from "./components/MarketPanel.vue";
 import LibraryWorkspace from "./components/library/LibraryWorkspace.vue";
@@ -93,6 +90,7 @@ const {
   showVersionDiffModal,
   currentVersionDiff,
   analyzeConflict,
+  loadSkillPackage,
   compareVersions,
   createVersion,
   renameVersion,
@@ -105,26 +103,17 @@ const {
   closeVersionManagerModal,
   openVersionDiffModal,
   closeVersionDiffModal,
-  librarySkills
-} = useSkillsManager();
-
-const {
+  librarySkills,
   projects,
   selectedProjectId,
   loadProjects,
   addProject,
   removeProject,
   updateProjectIdeTargets,
-  updateDetectedIdeDirs
-} = useProjectConfig();
-
-const {
+  updateDetectedIdeDirs,
   projectSkillSnapshots,
   refreshProjectSkillSnapshots,
-  restartProjectSnapshotRefreshLoop
-} = useProjectSnapshots({ projects, scanProjectSkills });
-
-const {
+  restartProjectSnapshotRefreshLoop,
   comparingFromVersion,
   comparingToVersion,
   currentDiff,
@@ -135,9 +124,11 @@ const {
   versionImportProjectSkillsLoading,
   setComparisonVersions,
   setVersionImportProject
-} = useVersionManagementState();
+} = useSkillsManager();
 
 const {
+  localBusy,
+  localBusyText,
   showProjectAddModal,
   showProjectConfigModal,
   showProjectExportModal,
@@ -147,15 +138,8 @@ const {
   closeProjectAddModal,
   openProjectConfigModal,
   closeProjectConfigModal,
-  openProjectExportModal,
   closeProjectExportModal,
-  openProjectImportModal,
-  closeProjectImportModal
-} = useProjectModals();
-
-const {
-  localBusy,
-  localBusyText,
+  closeProjectImportModal,
   handleRemoveProject,
   handleSelectProject,
   handleProjectAddConfirm,
@@ -172,7 +156,6 @@ const {
   projects,
   selectedProjectId,
   localSkills,
-  configuringProject,
   addProject,
   removeProject,
   updateProjectIdeTargets,
@@ -183,15 +166,7 @@ const {
   analyzeConflict,
   openConflictModal,
   closeConflictModal,
-  resolveConflict,
-  openProjectAddModal,
-  closeProjectAddModal,
-  openProjectConfigModal,
-  closeProjectConfigModal,
-  openProjectExportModal,
-  closeProjectExportModal,
-  openProjectImportModal,
-  closeProjectImportModal
+  resolveConflict
 });
 
 const displayBusy = computed(() => localBusy.value || busy.value);
@@ -219,6 +194,38 @@ watch(activeTab, (tab) => {
 
 async function handleConflictResolution(resolution: "keep" | "overwrite" | "coexist", coexistName?: string) {
   await handleConflictResolutionRaw(currentConflictSkill.value, resolution, coexistName);
+}
+
+async function handleRegisterVersion(sourcePath: string) {
+  if (!currentSkillPackage.value) return;
+  const pkg = currentSkillPackage.value;
+  const nextNum = pkg.versions.length + 1;
+  try {
+    await createVersion({
+      skillId: pkg.id,
+      sourcePath,
+      displayName: `v${nextNum}.0.0`,
+      version: `${nextNum}.0.0`,
+      source: "import",
+    });
+  } catch (err) {
+    console.error("Failed to register version:", err);
+  }
+}
+
+async function handleAdoptToRepo(path: string) {
+  try {
+    await invoke("import_local_skill", { request: { sourcePath: path } });
+    await scanLocalSkills();
+  } catch (err) {
+    console.error("Failed to adopt skill:", err);
+  }
+}
+
+function handleLibrarySelectSkill(skill: LocalSkill) {
+  if (!skill.currentVersion) return;
+  const skillId = skill.currentVersion.skillId || skill.id;
+  void loadSkillPackage(skillId);
 }
 
 function handleManageVersions(skill: LocalSkill) {
@@ -376,6 +383,9 @@ async function handlePickVersionImportProject(projectId: string) {
           @import="importLocalSkill"
           @retry-download="retryDownload"
           @remove-from-queue="removeFromQueue"
+          @select-skill="handleLibrarySelectSkill"
+          @adopt-to-repo="handleAdoptToRepo"
+          @register-version="handleRegisterVersion"
           @manage-versions="handleManageVersions"
           @compare-versions="handleCompareVersions"
           @create-version="handleOpenCreateVersionFromLibrary"

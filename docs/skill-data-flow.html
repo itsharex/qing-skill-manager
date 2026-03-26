@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Qing Skill Manager - 数据流泳道图</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #e1e4e8; padding: 40px 20px; }
+h1 { text-align: center; font-size: 22px; margin-bottom: 8px; color: #fff; }
+.subtitle { text-align: center; color: #6b7280; font-size: 13px; margin-bottom: 40px; }
+
+.swimlane-chart { max-width: 1100px; margin: 0 auto; }
+
+.lane { display: grid; grid-template-columns: 140px 1fr; margin-bottom: 2px; min-height: 60px; }
+.lane-label { background: #1c1f2b; padding: 14px 16px; font-weight: 700; font-size: 13px; display: flex; align-items: center; border-right: 3px solid; border-radius: 8px 0 0 8px; }
+.lane-content { background: #161822; padding: 12px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-radius: 0 8px 8px 0; overflow-x: auto; }
+
+.lane-user .lane-label { color: #60a5fa; border-color: #3b82f6; }
+.lane-vue .lane-label { color: #34d399; border-color: #10b981; }
+.lane-composable .lane-label { color: #a78bfa; border-color: #8b5cf6; }
+.lane-tauri .lane-label { color: #fbbf24; border-color: #f59e0b; }
+.lane-rust .lane-label { color: #f87171; border-color: #ef4444; }
+.lane-fs .lane-label { color: #9ca3af; border-color: #6b7280; }
+
+.node { padding: 8px 14px; border-radius: 8px; font-size: 12px; white-space: nowrap; font-weight: 500; flex-shrink: 0; }
+.node-action { background: #1e3a5f; border: 1px solid #3b82f6; color: #93c5fd; }
+.node-data { background: #1a2e1a; border: 1px solid #22c55e; color: #86efac; }
+.node-process { background: #2d1f4e; border: 1px solid #8b5cf6; color: #c4b5fd; }
+.node-io { background: #2d2006; border: 1px solid #f59e0b; color: #fde68a; }
+.node-file { background: #1f1f1f; border: 1px solid #6b7280; color: #d1d5db; }
+.node-result { background: #1a2e2e; border: 1px solid #14b8a6; color: #5eead4; }
+
+.arrow { color: #4b5563; font-size: 18px; flex-shrink: 0; display: flex; align-items: center; }
+
+.section { margin-bottom: 36px; }
+.section-title { font-size: 15px; font-weight: 700; color: #e5e7eb; margin-bottom: 12px; padding: 10px 16px; background: #1c1f2b; border-radius: 8px; border-left: 4px solid; }
+.section-title.install { border-color: #3b82f6; }
+.section-title.scan { border-color: #10b981; }
+.section-title.library { border-color: #8b5cf6; }
+.section-title.detect { border-color: #f59e0b; }
+
+.legend { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-bottom: 32px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #9ca3af; }
+.legend-dot { width: 12px; height: 12px; border-radius: 4px; border: 1px solid; }
+</style>
+</head>
+<body>
+
+<h1>Qing Skill Manager 数据流泳道图</h1>
+<p class="subtitle">Git-like Skill 版本追踪系统 · 安装 → 扫描 → 状态检测 → UI 展示</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#1e3a5f;border-color:#3b82f6"></div>用户操作</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1a2e1a;border-color:#22c55e"></div>数据/状态</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#2d1f4e;border-color:#8b5cf6"></div>处理逻辑</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#2d2006;border-color:#f59e0b"></div>Tauri invoke</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1f1f1f;border-color:#6b7280"></div>文件系统</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1a2e2e;border-color:#14b8a6"></div>结果输出</div>
+</div>
+
+<div class="swimlane-chart">
+
+<!-- ==================== 安装流程 ==================== -->
+<div class="section">
+  <div class="section-title install">1. 安装流程 — 将 Skill 从中央仓库 clone 到 IDE/项目目录</div>
+
+  <div class="lane lane-user">
+    <div class="lane-label">用户</div>
+    <div class="lane-content">
+      <div class="node node-action">点击「安装到 IDE」</div>
+      <div class="arrow">→</div>
+      <div class="node node-action">选择目标 IDE + 项目</div>
+    </div>
+  </div>
+  <div class="lane lane-vue">
+    <div class="lane-label">Vue 组件</div>
+    <div class="lane-content">
+      <div class="node node-process">InstallModal 收集 installTargets</div>
+      <div class="arrow">→</div>
+      <div class="node node-process">emit("install", skill)</div>
+    </div>
+  </div>
+  <div class="lane lane-composable">
+    <div class="lane-label">Composable</div>
+    <div class="lane-content">
+      <div class="node node-process">useInstallActions.confirmInstallToIde()</div>
+      <div class="arrow">→</div>
+      <div class="node node-io">invoke("clone_local_skill", { request })</div>
+    </div>
+  </div>
+  <div class="lane lane-rust">
+    <div class="lane-label">Rust 后端</div>
+    <div class="lane-content">
+      <div class="node node-process">clone_local_skill()</div>
+      <div class="arrow">→</div>
+      <div class="node node-process">copy_dir_recursive()</div>
+      <div class="arrow">→</div>
+      <div class="node node-process">build_skill_version()</div>
+      <div class="arrow">→</div>
+      <div class="node node-process">write_install_sidecar()</div>
+    </div>
+  </div>
+  <div class="lane lane-fs">
+    <div class="lane-label">文件系统</div>
+    <div class="lane-content">
+      <div class="node node-file">~/.qing-skill-manager/skills/X/</div>
+      <div class="arrow">复制→</div>
+      <div class="node node-file">~/.{ide}/skills/X/</div>
+      <div class="arrow">+</div>
+      <div class="node node-file">.qing-skill-version.json</div>
+      <div class="node node-data" style="font-size:11px">{versionId, contentHash, installedAt}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 扫描流程 ==================== -->
+<div class="section">
+  <div class="section-title scan">2. 扫描流程 — scan_overview 收集全局 + 项目 + 插件 Skill</div>
+
+  <div class="lane lane-composable">
+    <div class="lane-label">Composable</div>
+    <div class="lane-content">
+      <div class="node node-process">useLocalInventory.scanLocalSkills()</div>
+      <div class="arrow">→</div>
+      <div class="node node-io">invoke("scan_overview", { ideDirs, projectDirs })</div>
+    </div>
+  </div>
+  <div class="lane lane-rust">
+    <div class="lane-label">Rust 后端</div>
+    <div class="lane-content">
+      <div class="node node-process">scan_overview()</div>
+    </div>
+  </div>
+  <div class="lane lane-rust">
+    <div class="lane-label">  ① 仓库扫描</div>
+    <div class="lane-content">
+      <div class="node node-process">collect_skills_from_dir(manager_dir)</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">manager_skills[] + manager_map[(hash, idx)]</div>
+    </div>
+  </div>
+  <div class="lane lane-rust">
+    <div class="lane-label">  ② 版本映射</div>
+    <div class="lane-content">
+      <div class="node node-process">遍历 manager_skills → get_skill_package()</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">version_hash_map { hash → (versionId, skillId) }</div>
+    </div>
+  </div>
+  <div class="lane lane-rust">
+    <div class="lane-label">  ③ IDE 扫描</div>
+    <div class="lane-content">
+      <div class="node node-process">collect_ide_skills(~/.{ide}/skills/, "global")</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">ide_skills[] (全局)</div>
+    </div>
+  </div>
+  <div class="lane lane-rust">
+    <div class="lane-label">  ④ 项目扫描</div>
+    <div class="lane-content">
+      <div class="node node-process">collect_ide_skills(project/.{ide}/skills/, "project")</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">ide_skills[] (项目级)</div>
+    </div>
+  </div>
+  <div class="lane lane-rust">
+    <div class="lane-label">  ⑤ 插件扫描</div>
+    <div class="lane-content">
+      <div class="node node-process">collect_plugin_skills(~/.claude/plugins/)</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">ide_skills[] (plugin, 只读)</div>
+    </div>
+  </div>
+  <div class="lane lane-rust">
+    <div class="lane-label">  返回</div>
+    <div class="lane-content">
+      <div class="node node-result">Overview { manager_skills, ide_skills }</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 版本检测 ==================== -->
+<div class="section">
+  <div class="section-title detect">3. 版本检测 — collect_ide_skills 内部的同步状态判定</div>
+
+  <div class="lane lane-rust">
+    <div class="lane-label">读取 sidecar</div>
+    <div class="lane-content">
+      <div class="node node-process">read_install_sidecar(skill_dir)</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">{versionId, contentHash} 或 默认空</div>
+    </div>
+  </div>
+  <div class="lane lane-rust">
+    <div class="lane-label">计算当前 hash</div>
+    <div class="lane-content">
+      <div class="node node-process">skill_content_hash(SKILL.md)</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">current_hash</div>
+    </div>
+  </div>
+  <div class="lane lane-rust">
+    <div class="lane-label">判定逻辑</div>
+    <div class="lane-content">
+      <div class="node node-result" style="background:#0d3320;border-color:#22c55e">有 sidecar + hash 匹配 → synced ✓</div>
+      <div class="node node-result" style="background:#3d2006;border-color:#f59e0b">有 sidecar + hash 不同 → modified ⚠</div>
+      <div class="node node-result" style="background:#1f1f2f;border-color:#6b7280">无 sidecar + 仓库匹配 → untracked ?</div>
+      <div class="node node-result" style="background:#2d1111;border-color:#ef4444">无匹配 → unknown ✗</div>
+    </div>
+  </div>
+  <div class="lane lane-rust">
+    <div class="lane-label">输出 IdeSkill</div>
+    <div class="lane-content">
+      <div class="node node-data">{name, ide, scope, managed, versionId, contentHash, installedHash, syncStatus}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== Library UI 渲染 ==================== -->
+<div class="section">
+  <div class="section-title library">4. Library UI 渲染 — 从原始数据到三栏展示</div>
+
+  <div class="lane lane-composable">
+    <div class="lane-label">useLocalInventory</div>
+    <div class="lane-content">
+      <div class="node node-data">localSkills.value = Overview.manager_skills</div>
+      <div class="arrow">+</div>
+      <div class="node node-data">ideSkills.value = Overview.ide_skills</div>
+    </div>
+  </div>
+  <div class="lane lane-composable">
+    <div class="lane-label">useProjectSnapshots</div>
+    <div class="lane-content">
+      <div class="node node-process">每 30s 扫描项目 skill</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">projectSkillSnapshots { projectId → ProjectSkill[] }</div>
+    </div>
+  </div>
+  <div class="lane lane-composable">
+    <div class="lane-label">useLibraryWorkspace</div>
+    <div class="lane-content">
+      <div class="node node-process">buildIdeInstallations()</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">installations[] (versionId + syncStatus)</div>
+    </div>
+  </div>
+  <div class="lane lane-composable">
+    <div class="lane-label"></div>
+    <div class="lane-content">
+      <div class="node node-process">buildProjectMappings()</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">projectMappings[] (synced/modified/conflict)</div>
+    </div>
+  </div>
+  <div class="lane lane-composable">
+    <div class="lane-label"></div>
+    <div class="lane-content">
+      <div class="node node-process">buildVersionSummaries()</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">versions[] (ideCount + projectCount)</div>
+    </div>
+  </div>
+  <div class="lane lane-composable">
+    <div class="lane-label"></div>
+    <div class="lane-content">
+      <div class="node node-process">determineSkillStatus()</div>
+      <div class="arrow">→</div>
+      <div class="node node-result">installed | modified | conflict | not-installed | outdated</div>
+    </div>
+  </div>
+
+  <div class="lane lane-vue">
+    <div class="lane-label">Sidebar (左)</div>
+    <div class="lane-content">
+      <div class="node node-result" style="background:#0d3320;border-color:#22c55e">已使用 ✓</div>
+      <div class="node node-result" style="background:#3d2006;border-color:#f59e0b">已修改 ⚠</div>
+      <div class="node node-result" style="background:#1f1f2f;border-color:#6b7280">未使用</div>
+      <div class="arrow">+</div>
+      <div class="node node-data">全局 N 个 IDE · N 个项目</div>
+    </div>
+  </div>
+  <div class="lane lane-vue">
+    <div class="lane-label">DetailPanel (中)</div>
+    <div class="lane-content">
+      <div class="node node-data">全局安装: Claude Code v1.0 ✓ | OpenCode v1.0 ⚠</div>
+      <div class="arrow">+</div>
+      <div class="node node-data">项目部署: my-project v1.0 ✓ | other v0.9 ⚠</div>
+    </div>
+  </div>
+  <div class="lane lane-vue">
+    <div class="lane-label">VersionRail (右)</div>
+    <div class="lane-content">
+      <div class="node node-data">v1.0 ★ default</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">├ Claude Code ✓ └ my-project ✓</div>
+      <div class="arrow">|</div>
+      <div class="node node-data">v0.9</div>
+      <div class="arrow">→</div>
+      <div class="node node-data">└ other-proj ⚠</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 存储结构 ==================== -->
+<div class="section">
+  <div class="section-title" style="border-color:#6b7280">5. 存储结构 — 文件系统布局</div>
+
+  <div class="lane lane-fs">
+    <div class="lane-label">中央仓库</div>
+    <div class="lane-content">
+      <div class="node node-file">~/.qing-skill-manager/skills/{name}/</div>
+      <div class="arrow">含</div>
+      <div class="node node-file">SKILL.md</div>
+      <div class="arrow">+</div>
+      <div class="node node-file">.qing-skill-manager-version.json</div>
+    </div>
+  </div>
+  <div class="lane lane-fs">
+    <div class="lane-label">版本注册表</div>
+    <div class="lane-content">
+      <div class="node node-file">~/.qing-skill-manager/versions/{skillId}/package.json</div>
+      <div class="arrow">+</div>
+      <div class="node node-file">{versionId}/metadata.json</div>
+    </div>
+  </div>
+  <div class="lane lane-fs">
+    <div class="lane-label">全局 clone</div>
+    <div class="lane-content">
+      <div class="node node-file">~/.{ide}/skills/{name}/</div>
+      <div class="arrow">含</div>
+      <div class="node node-file">SKILL.md</div>
+      <div class="arrow">+</div>
+      <div class="node node-file" style="border-color:#3b82f6;color:#93c5fd">.qing-skill-version.json ← 安装追踪</div>
+    </div>
+  </div>
+  <div class="lane lane-fs">
+    <div class="lane-label">项目 clone</div>
+    <div class="lane-content">
+      <div class="node node-file">project/.{ide}/skills/{name}/</div>
+      <div class="arrow">含</div>
+      <div class="node node-file">SKILL.md</div>
+      <div class="arrow">+</div>
+      <div class="node node-file" style="border-color:#3b82f6;color:#93c5fd">.qing-skill-version.json ← 安装追踪</div>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

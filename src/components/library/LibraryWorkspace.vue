@@ -45,6 +45,9 @@ const emit = defineEmits<{
   (e: "cloneToProject", project: CloneTargetProject, skillIds: string[]): void;
   (e: "compareVersions", fromVersionId: string, toVersionId: string): void;
   (e: "createVersion"): void;
+  (e: "selectSkill", skill: LocalSkill): void;
+  (e: "adoptToRepo", path: string): void;
+  (e: "registerVersion", sourcePath: string): void;
 }>();
 
 const searchQuery = ref("");
@@ -66,11 +69,41 @@ const platformOptions = computed(() => {
   return options;
 });
 
+const projectUsageMap = computed(() => {
+  const map = new Map<string, string[]>();
+  for (const ls of props.librarySkills) {
+    if (ls.usedByProjectIds.length > 0) {
+      map.set(ls.id, ls.usedByProjectIds);
+    }
+  }
+  return map;
+});
+
+const skillStatusMap = computed(() => {
+  const map = new Map<string, string>();
+  for (const ls of props.librarySkills) {
+    map.set(ls.id, ls.status);
+  }
+  return map;
+});
+
+const skillScopeMap = computed(() => {
+  const map = new Map<string, string>();
+  for (const ls of props.librarySkills) {
+    map.set(ls.id, ls.skillScope);
+  }
+  return map;
+});
+
+function isSkillUsed(skill: LocalSkill): boolean {
+  return skill.usedBy.length > 0 || (projectUsageMap.value.get(skill.id)?.length ?? 0) > 0;
+}
+
 const statusOptions = computed(() => {
   const counts = {
     all: props.librarySkills.length,
-    used: props.localSkills.filter((skill) => skill.usedBy.length > 0).length,
-    unused: props.localSkills.filter((skill) => skill.usedBy.length === 0).length
+    used: props.localSkills.filter((skill) => isSkillUsed(skill)).length,
+    unused: props.localSkills.filter((skill) => !isSkillUsed(skill)).length
   };
 
   return [
@@ -80,24 +113,57 @@ const statusOptions = computed(() => {
   ];
 });
 
+const allSidebarSkills = computed<LocalSkill[]>(() => {
+  // Start with repo skills
+  const result: LocalSkill[] = [...props.localSkills];
+
+  // Add unmanaged skills as synthetic LocalSkill entries
+  for (const ls of props.librarySkills) {
+    if (!ls.inRepo) {
+      result.push({
+        id: ls.id,
+        name: ls.name,
+        description: ls.description,
+        path: ls.path,
+        source: ls.source,
+        usedBy: [],
+        versionCount: 0
+      });
+    }
+  }
+
+  return result;
+});
+
 const filteredSidebarSkills = computed<LocalSkill[]>(() => {
   const keyword = searchQuery.value.trim().toLowerCase();
 
-  return props.localSkills.filter((skill) => {
+  return allSidebarSkills.value.filter((skill) => {
     const librarySkill = props.librarySkills.find((item) => item.id === skill.id);
     if (!librarySkill) {
       return false;
     }
 
-    if (platformFilter.value !== "all" && !librarySkill.installations.some((item) => item.ideId === platformFilter.value)) {
-      return false;
+    if (platformFilter.value !== "all") {
+      if (librarySkill.inRepo) {
+        if (!librarySkill.installations.some((item) => item.ideId === platformFilter.value)) {
+          return false;
+        }
+      } else {
+        if (!librarySkill.unmanagedSources.some((s) => s.ide === platformFilter.value)) {
+          return false;
+        }
+      }
     }
 
     if (statusFilter.value !== "all") {
-      if (statusFilter.value === "used" && skill.usedBy.length === 0) {
+      if (statusFilter.value === "used" && !librarySkill.inRepo) {
         return false;
       }
-      if (statusFilter.value === "unused" && skill.usedBy.length > 0) {
+      if (statusFilter.value === "used" && librarySkill.inRepo && !isSkillUsed(skill)) {
+        return false;
+      }
+      if (statusFilter.value === "unused" && isSkillUsed(skill)) {
         return false;
       }
     }
@@ -114,7 +180,7 @@ const selectedSkill = computed<LocalSkill | null>(() => {
   if (!selectedSkillId.value) {
     return null;
   }
-  return props.localSkills.find((skill) => skill.id === selectedSkillId.value) || null;
+  return allSidebarSkills.value.find((skill) => skill.id === selectedSkillId.value) || null;
 });
 
 const selectedLibrarySkill = computed<LibrarySkill | null>(() => {
@@ -132,11 +198,11 @@ const selectedVersion = computed<SkillVersion | null>(() => {
 });
 
 const selectedSkills = computed<LocalSkill[]>(() =>
-  props.localSkills.filter((skill) => selectedIds.value.includes(skill.id))
+  allSidebarSkills.value.filter((skill) => selectedIds.value.includes(skill.id))
 );
 
 watch(
-  () => props.localSkills,
+  allSidebarSkills,
   (skills) => {
     const availableIds = new Set(skills.map((skill) => skill.id));
     selectedIds.value = selectedIds.value.filter((id) => availableIds.has(id));
@@ -187,6 +253,7 @@ watch(
 
 function handleSelectSkill(skill: LocalSkill): void {
   selectedSkillId.value = skill.id;
+  emit("selectSkill", skill);
 }
 
 function handleToggleSelected(skillId: string, checked: boolean): void {
@@ -370,6 +437,9 @@ onUnmounted(() => {
       :status-filter="statusFilter"
       :platform-options="platformOptions"
       :status-options="statusOptions"
+      :project-usage-map="projectUsageMap"
+      :skill-status-map="skillStatusMap"
+      :skill-scope-map="skillScopeMap"
       @select="handleSelectSkill"
       @toggle-selected="handleToggleSelected"
       @toggle-select-all="handleToggleSelectAll"
@@ -388,6 +458,7 @@ onUnmounted(() => {
     <LibraryDetailPanel
       :skill="selectedSkill"
       :library-skill="selectedLibrarySkill"
+      :selected-version-id="selectedVersionId"
       :installing-id="installingId"
       :ide-options="ideOptions"
       :projects="projects"
@@ -396,6 +467,7 @@ onUnmounted(() => {
       @open-dir="$emit('openDir', $event)"
       @manage-versions="$emit('manageVersions', $event)"
       @delete="handleDelete"
+      @adopt-to-repo="$emit('adoptToRepo', $event)"
     />
 
     <div class="splitter" @mousedown="onSplitterDown('right', $event)" />
@@ -403,6 +475,7 @@ onUnmounted(() => {
     <LibraryVersionRail
       :style="{ width: railWidth + 'px', minWidth: MIN_RAIL + 'px', flexShrink: 0 }"
       :skill="selectedSkill"
+      :library-skill="selectedLibrarySkill"
       :selected-version-id="selectedVersion?.id || null"
       :skill-package="skillPackage"
       :loading="versionLoading"
@@ -410,6 +483,7 @@ onUnmounted(() => {
       @compare-versions="handleCompareSelectedVersion"
       @create-version="$emit('createVersion')"
       @set-default="handleSetDefaultVersion"
+      @register-version="$emit('registerVersion', $event)"
     />
   </div>
 </template>

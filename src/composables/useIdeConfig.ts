@@ -58,7 +58,7 @@ export function saveLastInstallTargets(labels: string[]): void {
  */
 export function useIdeConfig() {
   const ideOptions = ref<IdeOption[]>([]);
-  const selectedIdeFilter = ref("Antigravity");
+  const selectedIdeFilter = ref("Claude Code");
   const customIdeName = ref("");
   const customIdeDir = ref("");
 
@@ -69,7 +69,7 @@ export function useIdeConfig() {
   function refreshIdeOptions(): void {
     ideOptions.value = loadIdeOptions();
     if (!ideOptions.value.find((item) => item.label === selectedIdeFilter.value)) {
-      selectedIdeFilter.value = ideOptions.value[0]?.label ?? "Antigravity";
+      selectedIdeFilter.value = ideOptions.value[0]?.label ?? "Claude Code";
     }
   }
 

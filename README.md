@@ -32,18 +32,11 @@ Qing Skill Manager is built on top of the original [skills-manager](https://gith
 
 ## 🎯 Natively Supported IDEs (Alphabetical Order)
 
-- **Antigravity**: `.gemini/antigravity/skills`
 - **Claude Code**: `.claude/skills`
-- **CodeBuddy**: `.codebuddy/skills`
 - **Codex**: `.codex/skills`
 - **Cursor**: `.cursor/skills`
-- **Kiro**: `.kiro/skills`
 - **OpenClaw**: `.openclaw/skills`
-- **OpenCode**: `.config/opencode/skills`
-- **Qoder**: `.qoder/skills`
-- **Trae**: `.trae/skills`
-- **VSCode**: `.github/skills`
-- **Windsurf**: `.windsurf/skills`
+- **OpenCode**: `.config/opencode/skills` (project: `.opencode/skills`)
 
 ## 📖 Usage Guide
 

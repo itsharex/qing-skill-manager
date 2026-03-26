@@ -1,6 +1,7 @@
 use super::{
-    build_skill_version, collect_ide_skills, collect_skills_from_dir,
+    build_skill_version, collect_ide_skills, collect_plugin_skills, collect_skills_from_dir,
     read_skill_metadata, remove_path, skill_content_hash,
+    InstalledSkillSidecar, now_timestamp, write_install_sidecar,
 };
 use crate::types::{
     AdoptIdeSkillRequest, DeleteLocalSkillRequest, ImportRequest, InstallRequest,
@@ -53,6 +54,16 @@ pub fn clone_local_skill(request: InstallRequest) -> Result<InstallResult, Strin
         }
 
         copy_dir_recursive(&skill_path, &clone_path)?;
+
+        // Write install sidecar for version tracking
+        let version = build_skill_version(&skill_path, SkillVersionSource::Clone);
+        let _ = write_install_sidecar(&clone_path, &InstalledSkillSidecar {
+            version_id: Some(version.id),
+            content_hash: Some(version.content_hash),
+            installed_at: Some(now_timestamp()),
+            source_skill_id: Some(version.skill_id),
+        });
+
         installed.push(format!("{}: {}", target.name, clone_path.display()));
     }
 
@@ -108,12 +119,33 @@ pub fn scan_overview(request: LocalScanRequest) -> Result<Overview, String> {
         }
     }
 
+    // Build version hash map: content_hash → (version_id, skill_id)
+    // This enables matching IDE skills to specific versions
+    let mut version_hash_map = std::collections::HashMap::new();
+    for skill in &manager_skills {
+        if let Some(version) = &skill.current_version {
+            version_hash_map.entry(version.content_hash.clone())
+                .or_insert((version.id.clone(), version.skill_id.clone()));
+            // Also load full package to match against all versions
+            if let Ok(pkg) = super::version::get_skill_package(
+                crate::types::GetSkillPackageRequest { skill_id: version.skill_id.clone() }
+            ) {
+                for v in &pkg.package.versions {
+                    version_hash_map.entry(v.content_hash.clone())
+                        .or_insert((v.id.clone(), v.skill_id.clone()));
+                }
+            }
+        }
+    }
+
     for (label, dir) in &ide_dirs {
         ide_skills.extend(collect_ide_skills(
             dir,
             label,
+            "global",
             &manager_map,
             &mut manager_skills,
+            &version_hash_map,
         ));
     }
 
@@ -137,11 +169,19 @@ pub fn scan_overview(request: LocalScanRequest) -> Result<Overview, String> {
                 ide_skills.extend(collect_ide_skills(
                     &project_dir,
                     label,
+                    "project",
                     &manager_map,
                     &mut manager_skills,
+                    &version_hash_map,
                 ));
             }
         }
+    }
+
+    // Claude Code plugin skills (read-only display)
+    let plugins_dir = home.join(".claude/plugins");
+    if plugins_dir.exists() && plugins_dir.is_dir() {
+        ide_skills.extend(collect_plugin_skills(&plugins_dir, "Claude Code"));
     }
 
     Ok(Overview {
@@ -157,16 +197,11 @@ pub fn uninstall_skill(request: UninstallRequest) -> Result<String, String> {
 
     let ide_dirs: Vec<String> = if request.ide_dirs.is_empty() {
         vec![
-            ".gemini/antigravity/skills".to_string(),
             ".claude/skills".to_string(),
-            ".codebuddy/skills".to_string(),
             ".codex/skills".to_string(),
             ".cursor/skills".to_string(),
-            ".kiro/skills".to_string(),
-            ".qoder/skills".to_string(),
-            ".trae/skills".to_string(),
-            ".github/skills".to_string(),
-            ".windsurf/skills".to_string(),
+            ".openclaw/skills".to_string(),
+            ".config/opencode/skills".to_string(),
         ]
     } else {
         request
@@ -190,9 +225,11 @@ pub fn uninstall_skill(request: UninstallRequest) -> Result<String, String> {
     }
     if let Some(project) = request.project_dir {
         let base = PathBuf::from(project);
+        allowed_roots.push(base.join(".claude/skills"));
         allowed_roots.push(base.join(".codex/skills"));
-        allowed_roots.push(base.join(".trae/skills"));
-        allowed_roots.push(base.join(".opencode/skill"));
+        allowed_roots.push(base.join(".cursor/skills"));
+        allowed_roots.push(base.join(".openclaw/skills"));
+        allowed_roots.push(base.join(".opencode/skills"));
         allowed_roots.push(base.join(".qing-skill-manager/skills"));
     }
 
@@ -381,14 +418,51 @@ pub fn scan_project_ide_dirs(request: ProjectScanRequest) -> Result<ProjectScanR
 pub fn scan_project_opencode_skills(
     request: ScanProjectSkillsRequest,
 ) -> Result<ProjectSkillScanResult, String> {
+    scan_project_skills(request)
+}
+
+#[tauri::command]
+pub fn scan_project_skills(
+    request: ScanProjectSkillsRequest,
+) -> Result<ProjectSkillScanResult, String> {
     use super::version::get_skill_package;
     use crate::types::GetSkillPackageRequest;
 
     let project_dir = PathBuf::from(&request.project_dir);
     let manager_root = PathBuf::from(&request.manager_root);
 
-    let opencode_path = project_dir.join(".opencode/skills");
-    if !opencode_path.exists() || !opencode_path.is_dir() {
+    let project_ide_dirs = [
+        ".claude/skills",
+        ".codex/skills",
+        ".cursor/skills",
+        ".openclaw/skills",
+        ".opencode/skills",
+    ];
+
+    // Collect all skill entry paths from all IDE dirs, dedup by skill name
+    let mut seen_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut all_entry_paths: Vec<PathBuf> = Vec::new();
+
+    for ide_dir in &project_ide_dirs {
+        let ide_path = project_dir.join(ide_dir);
+        if !ide_path.exists() || !ide_path.is_dir() {
+            continue;
+        }
+        if let Ok(entries) = fs::read_dir(&ide_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_dir() || !path.join("SKILL.md").exists() {
+                    continue;
+                }
+                let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                if seen_names.insert(name) {
+                    all_entry_paths.push(path);
+                }
+            }
+        }
+    }
+
+    if all_entry_paths.is_empty() {
         return Ok(ProjectSkillScanResult {
             project_path: request.project_dir,
             skills: Vec::new(),
@@ -411,30 +485,7 @@ pub fn scan_project_opencode_skills(
     let mut managed_version_count = 0;
     let mut conflict_count = 0;
 
-    let entries = match fs::read_dir(&opencode_path) {
-        Ok(entries) => entries,
-        Err(_) => {
-            return Ok(ProjectSkillScanResult {
-                project_path: request.project_dir,
-                skills: Vec::new(),
-                new_count: 0,
-                duplicate_count: 0,
-                managed_version_count: 0,
-                conflict_count: 0,
-            })
-        }
-    };
-
-    for entry in entries {
-        let entry = match entry {
-            Ok(item) => item,
-            Err(_) => continue,
-        };
-        let path = entry.path();
-        if !path.is_dir() || !path.join("SKILL.md").exists() {
-            continue;
-        }
-
+    for path in all_entry_paths {
         let (name, description) = read_skill_metadata(&path);
         let incoming_version = build_skill_version(&path, SkillVersionSource::Project);
         let candidates = existing_names.get(&name).cloned().unwrap_or_default();

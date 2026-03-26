@@ -27,6 +27,7 @@ pub use scan::scan_overview;
 pub use scan::uninstall_skill;
 pub use scan::scan_project_ide_dirs;
 pub use scan::scan_project_opencode_skills;
+pub use scan::scan_project_skills;
 pub use version::compare_skill_versions;
 pub use version::create_skill_version;
 pub use version::delete_skill_version;
@@ -40,6 +41,7 @@ pub use variant::update_skill_variant;
 
 // Shared constants and types
 pub(crate) const VERSION_METADATA_FILE: &str = ".qing-skill-manager-version.json";
+pub(crate) const INSTALL_SIDECAR_FILE: &str = ".qing-skill-version.json";
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
@@ -65,6 +67,33 @@ pub(crate) struct ParsedSkillMetadata {
 pub(crate) struct StoredPackageState {
     pub default_version: Option<String>,
     pub variants: Vec<SkillVariant>,
+}
+
+/// Metadata written into IDE/project skill directories on installation
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct InstalledSkillSidecar {
+    pub version_id: Option<String>,
+    pub content_hash: Option<String>,
+    pub installed_at: Option<i64>,
+    pub source_skill_id: Option<String>,
+}
+
+pub(crate) fn read_install_sidecar(skill_dir: &Path) -> InstalledSkillSidecar {
+    let path = skill_dir.join(INSTALL_SIDECAR_FILE);
+    if !path.exists() {
+        return InstalledSkillSidecar::default();
+    }
+    fs::read_to_string(&path)
+        .ok()
+        .and_then(|content| serde_json::from_str(&content).ok())
+        .unwrap_or_default()
+}
+
+pub(crate) fn write_install_sidecar(skill_dir: &Path, sidecar: &InstalledSkillSidecar) -> Result<(), String> {
+    let path = skill_dir.join(INSTALL_SIDECAR_FILE);
+    let content = serde_json::to_string_pretty(sidecar).map_err(|e| e.to_string())?;
+    fs::write(path, content).map_err(|e| e.to_string())
 }
 
 // Shared helper functions
@@ -484,8 +513,10 @@ pub(crate) fn collect_skills_from_dir(base: &Path, source: &str, ide: Option<&st
 pub(crate) fn collect_ide_skills(
     base: &Path,
     ide_label: &str,
+    scope: &str,
     manager_map: &[(String, usize)],
     manager_skills: &mut [LocalSkill],
+    version_hash_map: &std::collections::HashMap<String, (String, String)>,
 ) -> Vec<IdeSkill> {
     let mut skills = Vec::new();
     if !base.exists() {
@@ -512,24 +543,16 @@ pub(crate) fn collect_ide_skills(
         }
 
         let skill_dir = path.as_path();
-        let has_skill_file = skill_dir.join("SKILL.md").exists();
-        if !has_skill_file {
+        if !skill_dir.join("SKILL.md").exists() {
             continue;
         }
 
-        let name = if has_skill_file {
-            read_skill_metadata(skill_dir).0
-        } else {
-            skill_dir
-                .file_name()
-                .and_then(|value| value.to_str())
-                .unwrap_or("skill")
-                .to_string()
-        };
-
+        let name = read_skill_metadata(skill_dir).0;
         let path = skill_dir.to_path_buf();
-        let mut managed = false;
         let content_hash = skill_content_hash(&path);
+
+        // Check manager match (existing logic)
+        let mut managed = false;
         for (manager_hash, idx) in manager_map {
             if *manager_hash == content_hash {
                 managed = true;
@@ -541,6 +564,35 @@ pub(crate) fn collect_ide_skills(
                 break;
             }
         }
+
+        // Read install sidecar for version tracking
+        let sidecar = read_install_sidecar(&path);
+        let has_sidecar = sidecar.version_id.is_some();
+
+        let (version_id, installed_hash, sync_status) = if has_sidecar {
+            let installed_h = sidecar.content_hash.clone();
+            if installed_h.as_deref() == Some(&content_hash) {
+                // Content unchanged since install → synced
+                (sidecar.version_id.clone(), installed_h, "synced".to_string())
+            } else {
+                // Content changed since install → modified
+                managed = true; // was installed by us
+                (sidecar.version_id.clone(), installed_h, "modified".to_string())
+            }
+        } else if managed {
+            // No sidecar but hash matches manager → legacy install
+            let matched_version = version_hash_map.get(&content_hash).map(|(vid, _)| vid.clone());
+            (matched_version, None, "untracked".to_string())
+        } else {
+            // Try version_hash_map for unmanaged skills
+            if let Some((vid, _)) = version_hash_map.get(&content_hash) {
+                managed = true;
+                (Some(vid.clone()), None, "untracked".to_string())
+            } else {
+                (None, None, "unknown".to_string())
+            }
+        };
+
         let source = if managed { "managed" } else { "local" };
 
         skills.push(IdeSkill {
@@ -550,7 +602,58 @@ pub(crate) fn collect_ide_skills(
             ide: ide_label.to_string(),
             source: source.to_string(),
             managed,
+            scope: scope.to_string(),
+            version_id,
+            content_hash: Some(content_hash),
+            installed_hash,
+            sync_status,
         });
+    }
+
+    skills
+}
+
+/// Scan Claude Code plugin directories for top-level skills only.
+/// Matches: {base}/**/skills/{skill-name}/SKILL.md (direct children of "skills/" dirs)
+pub(crate) fn collect_plugin_skills(base: &Path, ide_label: &str) -> Vec<IdeSkill> {
+    let mut skills = Vec::new();
+    if !base.exists() {
+        return skills;
+    }
+
+    for entry in walkdir::WalkDir::new(base)
+        .min_depth(1)
+        .max_depth(6)
+        .into_iter()
+        .flatten()
+    {
+        if entry.file_name() != "skills" || !entry.file_type().is_dir() {
+            continue;
+        }
+        let skills_dir = entry.path();
+        let Ok(children) = fs::read_dir(skills_dir) else {
+            continue;
+        };
+        for child in children.flatten() {
+            let path = child.path();
+            if !path.is_dir() || !path.join("SKILL.md").exists() {
+                continue;
+            }
+            let (name, _) = read_skill_metadata(&path);
+            skills.push(IdeSkill {
+                id: path.display().to_string(),
+                name,
+                path: path.display().to_string(),
+                ide: ide_label.to_string(),
+                source: "plugin".to_string(),
+                managed: false,
+                scope: "plugin".to_string(),
+                version_id: None,
+                content_hash: None,
+                installed_hash: None,
+                sync_status: "unknown".to_string(),
+            });
+        }
     }
 
     skills
@@ -995,7 +1098,7 @@ mod tests {
         copy_dir_recursive(&manager_skill_dir, &copied_skill_dir).expect("copy skill to ide");
 
         let overview = scan::scan_overview(LocalScanRequest {
-            project_dir: None,
+            project_dirs: vec![],
             ide_dirs: vec![IdeDir {
                 label: "Test IDE".to_string(),
                 relative_dir: ide_root.display().to_string(),

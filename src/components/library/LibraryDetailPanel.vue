@@ -8,6 +8,7 @@ const { t } = useI18n();
 const props = defineProps<{
   skill: LocalSkill | null;
   librarySkill: LibrarySkill | null;
+  selectedVersionId: string | null;
   installingId: string | null;
   ideOptions: IdeOption[];
   projects: ProjectConfig[];
@@ -19,22 +20,48 @@ defineEmits<{
   (e: "openDir", path: string): void;
   (e: "manageVersions", skill: LocalSkill): void;
   (e: "delete", skill: LocalSkill): void;
+  (e: "adoptToRepo", path: string): void;
 }>();
 
 const isInstalling = computed<boolean>(() => {
   return !!props.skill && props.installingId === props.skill.id;
 });
 
-const linkedIdes = computed(() => {
-  if (!props.skill) {
-    return [];
-  }
-
-  return props.ideOptions.map((option) => ({
-    label: option.label,
-    active: props.skill?.usedBy.includes(option.label) ?? false
-  }));
+const globalInstallations = computed(() => {
+  const all = props.librarySkill?.installations.filter((i) => i.scope === "global") || [];
+  if (!props.selectedVersionId) return all;
+  return all.filter((i) => i.versionId === props.selectedVersionId);
 });
+
+const versionProjectMappings = computed(() => {
+  const all = props.librarySkill?.projectMappings || [];
+  if (!props.selectedVersionId) return all;
+  return all.filter((m) => m.versionId === props.selectedVersionId);
+});
+
+const selectedVersionName = computed(() => {
+  if (!props.selectedVersionId || !props.librarySkill) return null;
+  const v = props.librarySkill.versions.find((v) => v.id === props.selectedVersionId);
+  return v?.displayName || null;
+});
+
+function getSyncBadgeClass(status: string): string {
+  if (status === "synced" || status === "untracked") return "success";
+  if (status === "modified") return "warning";
+  return "muted";
+}
+
+function getSyncLabel(status: string): string {
+  if (status === "synced" || status === "untracked") return t("library.syncSynced");
+  if (status === "modified") return t("library.syncModified");
+  return t("library.syncUnknown");
+}
+
+function getVersionName(versionId: string | null): string {
+  if (!versionId || !props.librarySkill) return "";
+  const vs = props.librarySkill.versions.find((v) => v.id === versionId);
+  return vs?.displayName || versionId;
+}
 
 const cloneProjects = computed(() => {
   if (!props.projects.length) {
@@ -66,6 +93,13 @@ function getMappingLabel(status: string): string {
   if (status === "modified") return t("library.mappingStatusModified");
   return t("library.mappingStatusMissing");
 }
+
+function getMappingDescription(status: string): string {
+  if (status === "synced") return t("library.mappingDescSynced");
+  if (status === "conflict") return t("library.mappingDescConflict");
+  if (status === "modified") return t("library.mappingDescModified");
+  return t("library.mappingDescMissing");
+}
 </script>
 
 <template>
@@ -77,10 +111,37 @@ function getMappingLabel(status: string): string {
       </div>
     </div>
 
+    <!-- Unmanaged skill detail -->
+    <div v-else-if="!librarySkill.inRepo" class="skill-detail">
+      <div class="detail-header">
+        <div class="skill-identity">
+          <h1 class="skill-title"><span class="repo-dot not-in-repo">○</span> {{ skill.name }}</h1>
+          <div class="skill-subtitle">
+            <span class="status-badge unmanaged">{{ t("library.status.unmanaged") }}</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="ghost" @click="$emit('openDir', skill.path)">{{ t("library.detail.openDir") }}</button>
+        </div>
+      </div>
+
+      <section class="panel hero-panel">
+        <p class="card-desc">{{ t("library.unmanagedDesc") }}</p>
+        <div v-for="src in librarySkill.unmanagedSources" :key="src.path" class="detail-meta-row">
+          <span class="detail-label">{{ src.ide }} ({{ src.scope === "global" ? t("ide.scopeGlobal") : t("ide.scopeProject") }})</span>
+          <code class="card-link path-value">{{ src.path }}</code>
+        </div>
+        <div class="actions buttons">
+          <button class="primary" @click="$emit('adoptToRepo', skill.path)">{{ t("library.adoptToRepo") }}</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- Managed skill detail -->
     <div v-else class="skill-detail">
       <div class="detail-header">
         <div class="skill-identity">
-          <h1 class="skill-title">{{ skill.name }}</h1>
+          <h1 class="skill-title"><span class="repo-dot in-repo">●</span> {{ skill.name }}</h1>
           <div class="skill-subtitle">
             <span v-if="skill.currentVersion" class="version-chip">{{ skill.currentVersion.displayName }}</span>
             <span class="version-meta-text">{{ t("library.detail.versionCount", { count: skill.versionCount }) }}</span>
@@ -112,39 +173,63 @@ function getMappingLabel(status: string): string {
         </div>
       </section>
 
+      <div v-if="selectedVersionName" class="version-filter-bar">
+        <span class="version-filter-label">{{ t("library.filterByVersion") }}</span>
+        <span class="version-chip">{{ selectedVersionName }}</span>
+      </div>
+
       <section class="panel section-panel">
         <div class="section-title-row">
-          <div class="panel-title section-title-text">{{ t("library.detail.installationStatus") }}</div>
-          <div class="hint">{{ t("library.installedIn") }}</div>
+          <div class="panel-title section-title-text">{{ t("library.globalInstallations") }}</div>
+          <div class="hint">{{ globalInstallations.length > 0 ? `${globalInstallations.length} IDE` : "" }}</div>
         </div>
-        <div class="ide-badges">
-          <span v-for="ide in linkedIdes" :key="ide.label" class="ide-badge" :class="{ active: ide.active }">{{ ide.label }}</span>
+        <div v-if="globalInstallations.length === 0" class="hint">{{ selectedVersionId ? t("library.noInstallForVersion") : t("library.notInstalled") }}</div>
+        <div v-else class="install-list">
+          <div v-for="inst in globalInstallations" :key="inst.skillPath" class="install-entry">
+            <div class="install-info">
+              <span class="install-ide">{{ inst.ideLabel }}</span>
+              <span v-if="inst.versionId" class="version-meta-text">{{ getVersionName(inst.versionId) }}</span>
+            </div>
+            <span class="mapping-badge" :class="getSyncBadgeClass(inst.syncStatus)">{{ getSyncLabel(inst.syncStatus) }}</span>
+          </div>
         </div>
       </section>
 
       <section class="panel section-panel">
         <div class="section-title-row">
-          <div class="panel-title section-title-text">{{ t("library.projectMappings") }}</div>
-          <div class="hint">{{ t("library.cloneHint") }}</div>
+          <div class="panel-title section-title-text">{{ t("library.projectDeployments") }}</div>
         </div>
-        <div v-if="librarySkill.projectMappings.length === 0" class="hint">{{ t("library.notUsedInProjects") }}</div>
+        <div v-if="versionProjectMappings.length === 0" class="hint">{{ selectedVersionId ? t("library.noProjectForVersion") : t("library.notUsedInProjects") }}</div>
         <div v-else class="mapping-list">
-          <article v-for="mapping in librarySkill.projectMappings" :key="mapping.projectId" class="card mapping-card">
+          <article v-for="mapping in versionProjectMappings" :key="mapping.projectId" class="card mapping-card">
             <div class="mapping-header">
-              <div>
+              <div class="mapping-title-block">
                 <div class="card-title">{{ mapping.projectName }}</div>
-                <div class="card-meta">{{ mapping.projectPath }}</div>
+                <span class="mapping-badge" :class="getMappingBadgeClass(mapping.status)">{{ getMappingLabel(mapping.status) }}</span>
               </div>
-              <span class="mapping-badge" :class="getMappingBadgeClass(mapping.status)">{{ getMappingLabel(mapping.status) }}</span>
             </div>
-            <div class="mapping-meta">
-              <span class="version-meta-text">{{ mapping.versionName || t("library.mappingEmptyVersion") }}</span>
-              <span class="version-meta-text">{{ t("projects.ideTargets", { count: mapping.ideTargets.length }) }}</span>
+            <div class="mapping-detail">
+              <div class="mapping-detail-row">
+                <span class="detail-label">{{ t("library.detail.path") }}</span>
+                <code class="card-link path-value">{{ mapping.projectPath }}</code>
+              </div>
+              <div class="mapping-detail-row">
+                <span class="detail-label">{{ t("library.versionLabel") }}</span>
+                <span>{{ mapping.versionName || t("library.mappingEmptyVersion") }}</span>
+              </div>
+              <div class="mapping-detail-row">
+                <span class="detail-label">IDE</span>
+                <span>{{ mapping.ideTargets.join(", ") || "—" }}</span>
+              </div>
+              <div class="mapping-status-desc hint">{{ getMappingDescription(mapping.status) }}</div>
+            </div>
+            <div v-if="mapping.status === 'missing'" class="mapping-action">
+              <button class="ghost btn-sm" @click="$emit('cloneToProject', mapping.projectId)">{{ t("library.actions.clone") }}</button>
             </div>
           </article>
         </div>
-        <div class="clone-grid">
-          <button v-for="project in cloneProjects" :key="project.id" class="ghost clone-button" @click="$emit('cloneToProject', project.id)">
+        <div v-if="cloneProjects.some((p) => !p.mapped)" class="clone-grid">
+          <button v-for="project in cloneProjects.filter((p) => !p.mapped)" :key="project.id" class="ghost clone-button" @click="$emit('cloneToProject', project.id)">
             <span>{{ t("library.actions.clone") }} · {{ project.name }}</span>
             <span class="hint">{{ project.ideTargets.join(", ") || t("projects.emptyHint") }}</span>
           </button>
@@ -286,10 +371,33 @@ function getMappingLabel(status: string): string {
   align-items: flex-start;
 }
 
-.mapping-meta {
+.mapping-title-block {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.mapping-detail {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mapping-detail-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 13px;
+}
+
+.mapping-status-desc {
+  margin-top: 4px;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.mapping-action {
   margin-top: 8px;
 }
 
@@ -350,5 +458,66 @@ function getMappingLabel(status: string): string {
 
 .clone-button .hint {
   text-align: right;
+}
+
+.install-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.install-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+}
+
+.install-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.install-ide {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.repo-dot {
+  font-size: 12px;
+  margin-right: 6px;
+}
+
+.repo-dot.in-repo { color: var(--color-success-text); }
+.repo-dot.not-in-repo { color: var(--color-muted); }
+
+.version-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: var(--color-chip-bg);
+  border: 1px solid var(--color-chip-border);
+  font-size: 13px;
+}
+
+.version-filter-label {
+  color: var(--color-muted);
+}
+
+.status-badge.unmanaged {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  color: var(--color-muted);
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
 }
 </style>

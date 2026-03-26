@@ -5,11 +5,9 @@ function runConstantsTests() {
   // Test getProjectIdeRelativeDir for all supported IDEs
   assert.equal(getProjectIdeRelativeDir("OpenCode"), ".opencode/skills");
   assert.equal(getProjectIdeRelativeDir("Claude Code"), ".claude/skills");
+  assert.equal(getProjectIdeRelativeDir("Codex"), ".codex/skills");
   assert.equal(getProjectIdeRelativeDir("Cursor"), ".cursor/skills");
-  assert.equal(getProjectIdeRelativeDir("Windsurf"), ".windsurf/skills");
-  assert.equal(getProjectIdeRelativeDir("Kiro"), ".kiro/skills");
-  assert.equal(getProjectIdeRelativeDir("VSCode"), ".github/skills");
-  assert.equal(getProjectIdeRelativeDir("Antigravity"), ".gemini/antigravity/skills");
+  assert.equal(getProjectIdeRelativeDir("OpenClaw"), ".openclaw/skills");
   assert.equal(getProjectIdeRelativeDir("UnknownIDE"), null);
   assert.equal(getProjectIdeRelativeDir(""), null);
 
@@ -45,7 +43,7 @@ function runConstantsTests() {
     "/tmp/My Project Name/.opencode/skills"
   );
 
-  // Test buildProjectCloneTargetPath with newly added IDEs
+  // Test buildProjectCloneTargetPath with other IDEs
   assert.equal(
     buildProjectCloneTargetPath("/tmp/demo", "Claude Code"),
     "/tmp/demo/.claude/skills"
@@ -55,11 +53,15 @@ function runConstantsTests() {
     "/tmp/demo/.cursor/skills"
   );
   assert.equal(
-    buildProjectCloneTargetPath("/tmp/demo", "Windsurf"),
-    "/tmp/demo/.windsurf/skills"
+    buildProjectCloneTargetPath("/tmp/demo", "Codex"),
+    "/tmp/demo/.codex/skills"
+  );
+  assert.equal(
+    buildProjectCloneTargetPath("/tmp/demo", "OpenClaw"),
+    "/tmp/demo/.openclaw/skills"
   );
 
-  console.log("✓ All constants tests passed (17 assertions)");
+  console.log("✓ All constants tests passed (18 assertions)");
 }
 
 runConstantsTests();
