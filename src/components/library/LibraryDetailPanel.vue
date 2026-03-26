@@ -114,21 +114,33 @@ function getMappingDescription(status: string): string {
           <h1 class="skill-title"><span class="repo-dot not-in-repo">○</span> {{ skill.name }}</h1>
           <div class="skill-subtitle">
             <span class="status-badge unmanaged">{{ t("library.status.unmanaged") }}</span>
+            <span class="version-meta-text">{{ librarySkill.unmanagedSources.length }} {{ t("library.versions.locations") }}</span>
           </div>
         </div>
         <div class="header-actions">
-          <button class="ghost" @click="$emit('openDir', skill.path)">{{ t("library.detail.openDir") }}</button>
+          <button class="primary" @click="$emit('adoptToRepo', librarySkill.unmanagedSources[0]?.path || skill.path)">{{ t("library.adoptToRepo") }}</button>
         </div>
       </div>
 
       <section class="panel hero-panel">
         <p class="card-desc">{{ t("library.unmanagedDesc") }}</p>
-        <div v-for="src in librarySkill.unmanagedSources" :key="src.path" class="detail-meta-row">
-          <span class="detail-label">{{ src.ide }} ({{ src.scope === "global" ? t("ide.scopeGlobal") : t("ide.scopeProject") }})</span>
-          <code class="card-link path-value">{{ src.path }}</code>
+      </section>
+
+      <section class="panel section-panel">
+        <div class="section-title-row">
+          <div class="panel-title section-title-text">{{ t("library.versions.sources") }}</div>
         </div>
-        <div class="actions buttons">
-          <button class="primary" @click="$emit('adoptToRepo', skill.path)">{{ t("library.adoptToRepo") }}</button>
+        <div class="install-list">
+          <div v-for="src in librarySkill.unmanagedSources" :key="src.path" class="install-entry">
+            <div class="install-info">
+              <span class="install-ide">{{ src.label }}</span>
+              <span class="mapping-badge muted">{{ src.ide }} · {{ src.scope === "global" ? t("ide.scopeGlobal") : t("ide.scopeProject") }}</span>
+            </div>
+            <div class="install-actions">
+              <button class="ghost btn-xs" @click="$emit('openDir', src.path)">{{ t("ide.openDir") }}</button>
+              <button class="ghost danger btn-xs" @click="$emit('uninstallSkill', src.path)">{{ t("ide.uninstall") }}</button>
+            </div>
+          </div>
         </div>
       </section>
     </div>
