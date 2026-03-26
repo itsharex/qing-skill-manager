@@ -177,7 +177,7 @@ const detectedVersions = computed(() => {
               <span v-if="skill.currentVersion?.id === version.id" class="badge muted">{{ t("library.versions.active") }}</span>
             </div>
           </div>
-          <div class="card-meta">{{ version.version }} · {{ new Date(version.createdAt).toLocaleDateString() }}</div>
+          <div class="card-meta">{{ version.version }} · {{ new Date(version.createdAt * 1000).toLocaleDateString() }}</div>
           <div class="version-source">{{ version.source }}</div>
           <div v-if="getVersionUsage(version.id).ideCount > 0 || getVersionUsage(version.id).projectCount > 0" class="version-usage">
             <span v-if="getVersionUsage(version.id).ideCount > 0" class="usage-tag">{{ t("library.globalIdes", { count: getVersionUsage(version.id).ideCount }) }}</span>

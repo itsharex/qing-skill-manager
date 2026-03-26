@@ -88,7 +88,7 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
 
       // Populate version usage counts from installations and project mappings
       for (const vs of versions) {
-        vs.ideCount = installations.filter((inst) => inst.versionId === vs.id).length;
+        vs.ideCount = installations.filter((inst) => inst.versionId === vs.id && inst.scope === "global").length;
         vs.projectCount = projectMappings.filter((pm) => pm.versionId === vs.id).length;
       }
 
@@ -328,10 +328,9 @@ export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {
 
     for (const ideSkill of allIdeSkills) {
       if (ideSkill.name !== localSkill.name) continue;
-      // Dedup by ide+scope+path to avoid duplicate entries
-      const key = `${ideSkill.ide}_${ideSkill.scope}_${ideSkill.path}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      // Dedup by skillPath
+      if (seen.has(ideSkill.path)) continue;
+      seen.add(ideSkill.path);
 
       const ideOption = allIdeOptions.find((opt) => opt.id === ideSkill.ide);
       installations.push({
