@@ -217,6 +217,12 @@ async function handleAdoptToRepo(path: string) {
   try {
     await invoke("import_local_skill", { request: { sourcePath: path } });
     await scanLocalSkills();
+    // Find the newly imported skill and load its package
+    const dirName = path.split("/").pop() || "";
+    const newSkill = localSkills.value.find((s) => s.name === dirName || s.path.endsWith(`/${dirName}`));
+    if (newSkill?.currentVersion) {
+      void loadSkillPackage(newSkill.currentVersion.skillId || newSkill.id);
+    }
   } catch (err) {
     console.error("Failed to adopt skill:", err);
   }
