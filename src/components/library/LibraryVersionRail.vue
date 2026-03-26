@@ -161,14 +161,12 @@ const groupedUnmanagedSources = computed(() => {
 
     <div v-if="!skill" class="empty-state hint">{{ t("library.versions.noSkill") }}</div>
     <div v-else-if="loading" class="empty-state hint">{{ t("library.versions.loading") }}</div>
-    <div v-else-if="sortedVersions.length === 0 && librarySkill && !librarySkill.inRepo" class="versions-list">
+    <div v-else-if="sortedVersions.length === 0 && librarySkill && !librarySkill.inRepo && groupedUnmanagedSources.length > 0" class="versions-list">
       <article v-for="group in groupedUnmanagedSources" :key="group.hash" class="card version-card detected">
         <button class="version-main" @click="emit('registerVersion', group.sources[0].path)">
           <div class="version-header">
             <div class="card-title"><span class="repo-dot not-in-repo">○</span> {{ t("library.status.unmanaged") }}</div>
-            <div class="version-badges">
-              <span class="badge muted">{{ group.sources.length }} {{ group.sources.length > 1 ? t("library.versions.locations") : t("library.versions.location") }}</span>
-            </div>
+            <span class="badge muted">{{ group.sources.length }} {{ t("library.versions.locations") }}</span>
           </div>
           <div class="deployment-list">
             <div v-for="src in group.sources" :key="src.path" class="deployment-entry">
@@ -230,22 +228,19 @@ const groupedUnmanagedSources = computed(() => {
         </div>
       </article>
 
-      <!-- Detected unregistered versions -->
-      <template v-if="detectedVersions.length > 0">
-        <div class="detected-header">{{ t("library.versions.detected") }}</div>
-        <article v-for="dv in detectedVersions" :key="dv.id" class="card version-card detected">
-          <div class="version-main">
-            <div class="version-header">
-              <div class="card-title"><span class="repo-dot not-in-repo">○</span> {{ dv.label }}</div>
-              <span class="badge muted">{{ t("library.status.unmanaged") }}</span>
-            </div>
-            <div class="card-meta">{{ dv.path }}</div>
+      <!-- Unregistered versions (modified/conflicted copies) -->
+      <article v-for="dv in detectedVersions" :key="dv.id" class="card version-card detected">
+        <button class="version-main" @click="emit('registerVersion', dv.path)">
+          <div class="version-header">
+            <div class="card-title"><span class="repo-dot not-in-repo">○</span> {{ dv.label }}</div>
+            <span class="badge muted">{{ t("library.status.unmanaged") }}</span>
           </div>
-          <div class="version-actions">
-            <button class="ghost action-btn" @click="$emit('registerVersion', dv.path)">{{ t("library.versions.register") }}</button>
-          </div>
-        </article>
-      </template>
+          <div class="card-meta">{{ dv.path }}</div>
+        </button>
+        <div class="version-actions">
+          <button class="ghost action-btn" @click="emit('registerVersion', dv.path)">{{ t("library.versions.register") }}</button>
+        </div>
+      </article>
     </div>
   </aside>
 </template>
