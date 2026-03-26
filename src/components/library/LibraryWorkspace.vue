@@ -48,6 +48,7 @@ const emit = defineEmits<{
   (e: "createVersion"): void;
   (e: "selectSkill", skill: LocalSkill): void;
   (e: "adoptToRepo", path: string): void;
+  (e: "adoptManyToRepo", paths: string[]): void;
   (e: "registerVersion", sourcePath: string): void;
   (e: "uninstallSkill", path: string): void;
 }>();
@@ -312,6 +313,17 @@ function handleClearSelection(): void {
   selectedIds.value = [];
 }
 
+function handleAdoptSelected(): void {
+  // Get paths of selected unmanaged skills
+  const paths = selectedIds.value
+    .map((id) => props.librarySkills.find((ls) => ls.id === id))
+    .filter((ls) => ls && !ls.inRepo && ls.unmanagedSources.length > 0)
+    .map((ls) => ls!.unmanagedSources[0].path);
+  if (paths.length > 0) {
+    emit("adoptManyToRepo", paths);
+  }
+}
+
 function handleInstallSelected(): void {
   if (selectedSkills.value.length === 0) {
     return;
@@ -465,6 +477,7 @@ onUnmounted(() => {
       @toggle-selected="handleToggleSelected"
       @toggle-select-all="handleToggleSelectAll"
       @install-selected="handleInstallSelected"
+      @adopt-selected="handleAdoptSelected"
       @delete-selected="handleDeleteSelected"
       @clear-selection="handleClearSelection"
       @delete-all="handleDeleteAll"

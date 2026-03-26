@@ -469,6 +469,7 @@ export default {
     inRepo: "已纳入仓库管理",
     notInRepo: "未纳入仓库，点击可纳管",
     adoptToRepo: "纳入仓库管理",
+    adoptSelectedCount: "批量纳管 ({count})",
     unmanagedDesc: "此 Skill 存在于 IDE 或项目目录中，但尚未纳入中央仓库管理。纳管后可进行版本管理和跨 IDE 安装。",
     filterByVersion: "筛选版本：",
     noInstallForVersion: "该版本未安装到任何 IDE",

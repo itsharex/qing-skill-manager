@@ -30,6 +30,7 @@ const emit = defineEmits<{
   (e: "toggleSelectAll", checked: boolean, filteredIds: string[]): void;
   (e: "installSelected"): void;
   (e: "deleteSelected"): void;
+  (e: "adoptSelected"): void;
   (e: "clearSelection"): void;
   (e: "deleteAll"): void;
   (e: "refresh"): void;
@@ -80,6 +81,10 @@ function getLinkedIdeCount(skill: LocalSkill): number {
   return skill.usedBy.length;
 }
 
+const selectedUnmanagedCount = computed(() =>
+  props.selectedIds.filter((id) => props.skillStatusMap.get(id) === "unmanaged").length
+);
+
 function getProjectCount(skill: LocalSkill): number {
   return props.projectUsageMap.get(skill.id)?.length ?? 0;
 }
@@ -117,6 +122,7 @@ function handleToggleAll(checked: boolean): void {
     <div v-if="selectedIds.length > 0" class="bulk-actions-bar">
       <div class="bulk-summary">{{ t("local.deleteSelectedCount", { count: selectedIds.length }) }}</div>
       <div class="bulk-actions">
+        <button v-if="selectedUnmanagedCount > 0" class="primary btn-sm" @click="$emit('adoptSelected')">{{ t("library.adoptSelectedCount", { count: selectedUnmanagedCount }) }}</button>
         <button class="primary btn-sm" @click="$emit('installSelected')">{{ t("local.installSelected", { count: selectedIds.length }) }}</button>
         <button class="ghost danger btn-sm" @click="$emit('deleteSelected')">{{ t("local.deleteSelected", { count: selectedIds.length }) }}</button>
         <button class="ghost btn-sm" @click="$emit('clearSelection')">{{ t("common.cancel") }}</button>

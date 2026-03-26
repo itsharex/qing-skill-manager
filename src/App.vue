@@ -232,6 +232,17 @@ async function handleAdoptToRepo(path: string) {
   }
 }
 
+async function handleAdoptManyToRepo(paths: string[]) {
+  try {
+    for (const path of paths) {
+      await invoke("import_local_skill", { request: { sourcePath: path } });
+    }
+    await scanLocalSkills();
+  } catch (err) {
+    console.error("Failed to batch adopt skills:", err);
+  }
+}
+
 async function handleLibraryUninstallSkill(path: string) {
   try {
     await invoke("uninstall_skill", {
@@ -399,6 +410,7 @@ async function handlePickVersionImportProject(projectId: string) {
           @remove-from-queue="removeFromQueue"
           @select-skill="handleLibrarySelectSkill"
           @adopt-to-repo="handleAdoptToRepo"
+          @adopt-many-to-repo="handleAdoptManyToRepo"
           @register-version="handleRegisterVersion"
           @uninstall-skill="handleLibraryUninstallSkill"
           @compare-versions="handleCompareVersions"

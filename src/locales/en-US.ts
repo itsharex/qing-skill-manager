@@ -469,6 +469,7 @@ export default {
     inRepo: "Managed in central repository",
     notInRepo: "Not in repository, click to adopt",
     adoptToRepo: "Add to Repository",
+    adoptSelectedCount: "Adopt Selected ({count})",
     unmanagedDesc: "This skill exists in an IDE or project directory but has not been added to the central repository. Adding it enables version management and cross-IDE installation.",
     filterByVersion: "Filtered by version:",
     noInstallForVersion: "This version is not installed in any IDE",
