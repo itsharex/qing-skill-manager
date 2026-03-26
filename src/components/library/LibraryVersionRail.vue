@@ -81,37 +81,48 @@ function getSyncIcon(status: string): string {
   return "?";
 }
 
-// Detect unregistered versions: only truly unmatched copies (not synced, not matched to any version)
+// Detect unregistered versions: only truly unmatched copies
 const detectedVersions = computed(() => {
   if (!props.librarySkill) return [];
   const results: Array<{ id: string; label: string; scope: string; path: string }> = [];
-  const seen = new Set<string>();
+  const seenPaths = new Set<string>();
 
-  // Only global installations that are genuinely modified (have sidecar but content changed)
+  // Collect project paths that have conflict status
+  const conflictProjectPaths = new Set<string>();
+  for (const pm of props.librarySkill.projectMappings) {
+    if (pm.status === "conflict") {
+      conflictProjectPaths.add(pm.projectPath);
+    }
+  }
+
+  // Global installations that are genuinely modified
   for (const inst of props.librarySkill.installations) {
-    if (inst.scope !== "global") continue;
     if (inst.syncStatus !== "modified") continue;
-    const key = inst.skillPath;
-    if (!seen.has(key)) {
-      seen.add(key);
+    // Skip if this path is inside a conflict project (will be shown via project mapping)
+    const isProjectCopy = conflictProjectPaths.has(inst.skillPath) ||
+      [...conflictProjectPaths].some((pp) => inst.skillPath.startsWith(pp + "/"));
+    if (isProjectCopy) continue;
+
+    if (!seenPaths.has(inst.skillPath)) {
+      seenPaths.add(inst.skillPath);
       results.push({
-        id: `detected_${key}`,
+        id: `detected_${inst.skillPath}`,
         label: `${inst.ideLabel} (${t("ide.scopeGlobal")})`,
-        scope: inst.scope,
+        scope: "global",
         path: inst.skillPath
       });
     }
   }
 
-  // Only project mappings with status "conflict" (content doesn't match ANY known version)
+  // Project mappings with conflict
   for (const pm of props.librarySkill.projectMappings) {
     if (pm.status !== "conflict") continue;
     const key = `project_${pm.projectId}`;
-    if (!seen.has(key)) {
-      seen.add(key);
+    if (!seenPaths.has(key)) {
+      seenPaths.add(key);
       results.push({
-        id: `detected_${key}`,
-        label: `${pm.projectName} (${t("ide.scopeProject")})`,
+        id: key,
+        label: `${pm.projectName}`,
         scope: "project",
         path: pm.projectPath
       });
