@@ -496,6 +496,7 @@ onUnmounted(() => {
       @rename-version="handleRenameVersion"
       @delete-version="handleDeleteVersion"
       @register-version="$emit('registerVersion', $event)"
+      @adopt-to-repo="$emit('adoptToRepo', $event)"
     />
   </div>
 </template>

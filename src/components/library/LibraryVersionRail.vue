@@ -21,6 +21,7 @@ const emit = defineEmits<{
   (e: "registerVersion", sourcePath: string): void;
   (e: "renameVersion", versionId: string, newName: string): void;
   (e: "deleteVersion", versionId: string): void;
+  (e: "adoptToRepo", path: string): void;
 }>();
 
 const editingVersionId = ref<string | null>(null);
@@ -163,7 +164,7 @@ const groupedUnmanagedSources = computed(() => {
     <div v-else-if="loading" class="empty-state hint">{{ t("library.versions.loading") }}</div>
     <div v-else-if="sortedVersions.length === 0 && librarySkill && !librarySkill.inRepo && groupedUnmanagedSources.length > 0" class="versions-list">
       <article v-for="group in groupedUnmanagedSources" :key="group.hash" class="card version-card detected">
-        <button class="version-main" @click="emit('registerVersion', group.sources[0].path)">
+        <div class="version-main">
           <div class="version-header">
             <div class="card-title"><span class="repo-dot not-in-repo">○</span> {{ t("library.status.unmanaged") }}</div>
             <span class="badge muted">{{ group.sources.length }} {{ t("library.versions.locations") }}</span>
@@ -174,9 +175,9 @@ const groupedUnmanagedSources = computed(() => {
               <span class="deploy-sync sync-muted">{{ src.ide }}</span>
             </div>
           </div>
-        </button>
+        </div>
         <div class="version-actions">
-          <button class="ghost action-btn" @click="emit('registerVersion', group.sources[0].path)">{{ t("library.adoptToRepo") }}</button>
+          <button class="ghost action-btn" @click="emit('adoptToRepo', group.sources[0].path)">{{ t("library.adoptToRepo") }}</button>
         </div>
       </article>
     </div>
