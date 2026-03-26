@@ -417,7 +417,7 @@ async function handlePickVersionImportProject(projectId: string) {
           @create-version="handleOpenCreateVersionFromLibrary"
           @set-default-version="setDefaultVersion"
           @rename-version="renameVersion"
-          @delete-version="(skillId, versionId) => deleteVersion(skillId, versionId, 'soft')"
+          @delete-version="(skillId, versionId) => deleteVersion(skillId, versionId, 'hard')"
         />
       </template>
 
