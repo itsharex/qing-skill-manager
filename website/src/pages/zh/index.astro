@@ -34,11 +34,11 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
           v0.3.22 &mdash; 开源项目
         </div>
         <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight mb-6">
-          一个应用管理所有<br />
-          <span class="bg-gradient-to-r from-foreground via-chart-3 to-muted-foreground bg-clip-text text-transparent">AI 技能</span>
+          每个项目，每个 IDE<br />
+          <span class="bg-gradient-to-r from-foreground via-chart-3 to-muted-foreground bg-clip-text text-transparent">所有 AI 技能，尽在掌控</span>
         </h1>
         <p class="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-          搜索公共市场、统一存入本地仓库、一键安装到任意 IDE、将带版本控制的副本部署到项目中 &mdash; 内建冲突检测与解决机制。
+          技能散落在 Cursor、Claude Code、OpenCode 和各个项目文件夹中？Qing Skill Manager 提供统一的技能库，支持多版本追踪、按项目部署、跨 IDE 同步 &mdash; 随时掌握每个技能安装在哪里。
         </p>
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
           <a
@@ -63,8 +63,8 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
         <div class="relative mx-auto max-w-5xl">
           <div class="absolute -inset-4 bg-gradient-to-r from-muted-foreground/10 via-accent/30 to-muted-foreground/10 rounded-2xl blur-2xl opacity-50"></div>
           <img
-            src={`${BASE}/screenshots/zh-CN/market.jpg`}
-            alt="Qing Skill Manager — 商店检索"
+            src={`${BASE}/screenshots/zh-CN/local.jpg`}
+            alt="Qing Skill Manager — Skill 库"
             class="relative rounded-xl border border-border/50 shadow-2xl w-full"
             loading="eager"
           />
@@ -96,56 +96,56 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
     <section id="features" class="py-20 px-6">
       <div class="max-w-6xl mx-auto">
         <div class="text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4">你需要的一切</h2>
-          <p class="text-muted-foreground text-lg max-w-2xl mx-auto">一套完整的工具，用于发现、版本管理和部署 AI 技能到你的整个开发环境。</p>
+          <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4">一个工具，全部搞定</h2>
+          <p class="text-muted-foreground text-lg max-w-2xl mx-auto">跨 Agent IDE、跨项目管理你设备上的所有技能 &mdash; 带版本控制、分类筛选和冲突解决。</p>
         </div>
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
             <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4 text-xl">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
             </div>
-            <h3 class="font-semibold text-lg mb-2">聚合市场检索</h3>
-            <p class="text-muted-foreground text-sm leading-relaxed">在一个界面中搜索 Claude Plugins、SkillsLLM 和 SkillsMP 的技能。一键下载或更新。</p>
-          </div>
-
-          <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
-            <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-            </div>
-            <h3 class="font-semibold text-lg mb-2">统一本地仓库</h3>
-            <p class="text-muted-foreground text-sm leading-relaxed">所有技能集中存储在 <code class="text-xs bg-muted px-1.5 py-0.5 rounded">~/.qing-skill-manager/skills</code>。浏览、筛选和管理你的全部收藏。</p>
-          </div>
-
-          <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
-            <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            </div>
-            <h3 class="font-semibold text-lg mb-2">一键安装</h3>
-            <p class="text-muted-foreground text-sm leading-relaxed">同时安装到多个 IDE。支持全局安装和项目级克隆，精确控制作用范围。</p>
+            <h3 class="font-semibold text-lg mb-2">多 IDE 统一管理</h3>
+            <p class="text-muted-foreground text-sm leading-relaxed">Claude Code、Cursor、Codex、OpenCode、OpenClaw &mdash; 每个都有自己的技能目录。在一个视图中查看全部，跨 IDE 安装或同步，也可以几秒内注册自定义 IDE。</p>
           </div>
 
           <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
             <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
             </div>
-            <h3 class="font-semibold text-lg mb-2">版本管理</h3>
-            <p class="text-muted-foreground text-sm leading-relaxed">Git 风格版本跟踪。对比版本差异、设置默认版本、创建变体，并为项目锁定指定版本。</p>
+            <h3 class="font-semibold text-lg mb-2">多版本追踪</h3>
+            <p class="text-muted-foreground text-sm leading-relaxed">每个技能可以有多个版本。逐行对比差异，设置默认版本，为不同场景创建命名变体，并为特定项目锁定指定版本。</p>
+          </div>
+
+          <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
+            <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
+            </div>
+            <h3 class="font-semibold text-lg mb-2">技能分类</h3>
+            <p class="text-muted-foreground text-sm leading-relaxed">技能分为已托管、未托管和仅插件三类。按 IDE 平台、状态或名称筛选。三栏式技能库：侧边栏、详情面板、版本轨。</p>
           </div>
 
           <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
             <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
             </div>
-            <h3 class="font-semibold text-lg mb-2">项目管理</h3>
-            <p class="text-muted-foreground text-sm leading-relaxed">注册项目、配置 IDE 目标、直接部署技能。自动检测已有技能并解决版本冲突。</p>
+            <h3 class="font-semibold text-lg mb-2">按项目部署</h3>
+            <p class="text-muted-foreground text-sm leading-relaxed">注册项目，配置 IDE 目标，部署指定版本。自动检测项目已有技能，冲突时提供保留、覆盖或共存选项。</p>
           </div>
 
           <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
             <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             </div>
-            <h3 class="font-semibold text-lg mb-2">IDE 浏览器</h3>
-            <p class="text-muted-foreground text-sm leading-relaxed">切换 IDE 视图查看安装情况。将未托管的技能纳入仓库统一管理，或添加任意自定义 IDE。</p>
+            <h3 class="font-semibold text-lg mb-2">市场发现</h3>
+            <p class="text-muted-foreground text-sm leading-relaxed">在一个界面搜索 Claude Plugins、SkillsLLM 和 SkillsMP。一键下载或更新，进入本地仓库后随时部署到任何位置。</p>
+          </div>
+
+          <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
+            <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </div>
+            <h3 class="font-semibold text-lg mb-2">冲突解决</h3>
+            <p class="text-muted-foreground text-sm leading-relaxed">当项目技能与仓库版本不一致时，应用自动检测。分析差异、获取解决建议，然后选择如何处理。</p>
           </div>
         </div>
       </div>

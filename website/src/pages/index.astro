@@ -34,11 +34,11 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
           v0.3.22 &mdash; Open Source
         </div>
         <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-tight mb-6">
-          One app for all your<br />
-          <span class="bg-gradient-to-r from-foreground via-chart-3 to-muted-foreground bg-clip-text text-transparent">AI Skills</span>
+          Every project. Every IDE.<br />
+          <span class="bg-gradient-to-r from-foreground via-chart-3 to-muted-foreground bg-clip-text text-transparent">All your AI Skills in one place.</span>
         </h1>
         <p class="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
-          Search public marketplaces, store skills in a local repository, install to any IDE with one click, and deploy versioned copies into projects &mdash; with conflict detection built in.
+          Skills scattered across Cursor, Claude Code, OpenCode, and a dozen project folders? Qing Skill Manager gives you a unified library with multi-version tracking, per-project deployment, and cross-IDE sync &mdash; so you always know what's installed where.
         </p>
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
           <a
@@ -63,8 +63,8 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
         <div class="relative mx-auto max-w-5xl">
           <div class="absolute -inset-4 bg-gradient-to-r from-muted-foreground/10 via-accent/30 to-muted-foreground/10 rounded-2xl blur-2xl opacity-50"></div>
           <img
-            src={`${BASE}/screenshots/market.jpg`}
-            alt="Qing Skill Manager — Marketplace Search"
+            src={`${BASE}/screenshots/local.jpg`}
+            alt="Qing Skill Manager — Skill Library"
             class="relative rounded-xl border border-border/50 shadow-2xl w-full"
             loading="eager"
           />
@@ -96,56 +96,56 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
     <section id="features" class="py-20 px-6">
       <div class="max-w-6xl mx-auto">
         <div class="text-center mb-16">
-          <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Everything you need</h2>
-          <p class="text-muted-foreground text-lg max-w-2xl mx-auto">A complete toolkit for discovering, versioning, and deploying AI skills across your entire development environment.</p>
+          <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4">One tool to rule them all</h2>
+          <p class="text-muted-foreground text-lg max-w-2xl mx-auto">Manage skills across Agent IDEs and projects on your device &mdash; with version control, classification, and conflict resolution.</p>
         </div>
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
             <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4 text-xl">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
             </div>
-            <h3 class="font-semibold text-lg mb-2">Marketplace Search</h3>
-            <p class="text-muted-foreground text-sm leading-relaxed">Search skills across Claude Plugins, SkillsLLM, and SkillsMP in one unified interface. Download or update with a single click.</p>
-          </div>
-
-          <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
-            <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-            </div>
-            <h3 class="font-semibold text-lg mb-2">Local Repository</h3>
-            <p class="text-muted-foreground text-sm leading-relaxed">All skills stored centrally at <code class="text-xs bg-muted px-1.5 py-0.5 rounded">~/.qing-skill-manager/skills</code>. Browse, filter, and manage your entire collection.</p>
-          </div>
-
-          <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
-            <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            </div>
-            <h3 class="font-semibold text-lg mb-2">One-Click Install</h3>
-            <p class="text-muted-foreground text-sm leading-relaxed">Install to multiple IDEs simultaneously. Supports global installation and project-level cloning scoped to specific workspaces.</p>
+            <h3 class="font-semibold text-lg mb-2">Multi-IDE Management</h3>
+            <p class="text-muted-foreground text-sm leading-relaxed">Claude Code, Cursor, Codex, OpenCode, OpenClaw &mdash; each has its own skills directory. See them all in one view, install or sync across IDEs, or add any custom IDE in seconds.</p>
           </div>
 
           <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
             <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
             </div>
-            <h3 class="font-semibold text-lg mb-2">Version Management</h3>
-            <p class="text-muted-foreground text-sm leading-relaxed">Git-style version tracking. Compare versions side-by-side, set defaults, create variants, and pin specific versions to projects.</p>
+            <h3 class="font-semibold text-lg mb-2">Multi-Version Tracking</h3>
+            <p class="text-muted-foreground text-sm leading-relaxed">Every skill can have multiple versions. Compare diffs side-by-side, set defaults, create named variants for different use cases, and pin specific versions to specific projects.</p>
+          </div>
+
+          <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
+            <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
+            </div>
+            <h3 class="font-semibold text-lg mb-2">Skill Classification</h3>
+            <p class="text-muted-foreground text-sm leading-relaxed">Skills are classified as Managed, Unmanaged, or Plugin-Only. Filter by IDE platform, status, or name. Three-column library workspace with sidebar, detail panel, and version rail.</p>
           </div>
 
           <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
             <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
             </div>
-            <h3 class="font-semibold text-lg mb-2">Project Management</h3>
-            <p class="text-muted-foreground text-sm leading-relaxed">Register projects, configure IDE targets, and deploy skills directly. Auto-detects existing skills and resolves version conflicts.</p>
+            <h3 class="font-semibold text-lg mb-2">Per-Project Deployment</h3>
+            <p class="text-muted-foreground text-sm leading-relaxed">Register projects, configure IDE targets, deploy specific versions. Auto-detects existing project skills and resolves conflicts with keep, overwrite, or coexist options.</p>
           </div>
 
           <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
             <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             </div>
-            <h3 class="font-semibold text-lg mb-2">IDE Browser</h3>
-            <p class="text-muted-foreground text-sm leading-relaxed">Switch between IDE views to inspect installations. Adopt unmanaged skills into your repo, or add any custom IDE.</p>
+            <h3 class="font-semibold text-lg mb-2">Marketplace Discovery</h3>
+            <p class="text-muted-foreground text-sm leading-relaxed">Search Claude Plugins, SkillsLLM, and SkillsMP in one interface. Download or update with one click. Skills land in your local repo, ready to deploy anywhere.</p>
+          </div>
+
+          <div class="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-muted-foreground/30 hover:shadow-lg transition-all backdrop-blur-sm">
+            <div class="w-10 h-10 rounded-lg bg-accent text-foreground flex items-center justify-center mb-4">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </div>
+            <h3 class="font-semibold text-lg mb-2">Conflict Resolution</h3>
+            <p class="text-muted-foreground text-sm leading-relaxed">When a project skill diverges from your repo version, the app detects it automatically. Analyze diffs, get resolution suggestions, then choose how to reconcile.</p>
           </div>
         </div>
       </div>

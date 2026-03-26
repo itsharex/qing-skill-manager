@@ -2,67 +2,88 @@
 
 [English](README.md) | [中文](README_zh-CN.md)
 
-> A desktop app for discovering, managing, and distributing AI skills across multiple IDEs and projects.
+> Manage all the AI skills on your machine — across every project and every Agent IDE — from a single desktop app.
 
 <p align="center">
-  <img src="docs/screenshots/en-US/market.jpg" width="720" alt="Marketplace Search" />
+  <img src="docs/screenshots/en-US/local.jpg" width="720" alt="Skill Library — three-column workspace" />
 </p>
 
-Qing Skill Manager gives you a single place to search public skill marketplaces, store skills in a local repository, install them globally to any supported IDE, and clone versioned copies into individual projects — with conflict detection and resolution built in.
+As AI-powered coding agents multiply, so do the skills scattered across your device: some in Cursor, some in Claude Code, some in OpenCode, different versions in different projects. Qing Skill Manager gives you **one central place** to see everything, keep it organized, and push the right version to the right place.
 
-Built with **Tauri 2 + Vue 3 + Rust**. Cross-platform desktop app.
+Built with **Tauri 2 + Vue 3 + Rust**. Open source. Cross-platform.
+
+## Why
+
+- You use **multiple Agent IDEs** (Claude Code, Cursor, Codex, OpenCode, ...) and each has its own skills directory
+- You work on **multiple projects**, each needing a different set (or different version) of skills
+- You've lost track of which skill is where, which version is current, and what's out of date
+- You want a **single source of truth** for all your AI skills on this machine
 
 ## Screenshots
 
-| Local Skills | Market |
+| Skill Library | Marketplace |
 |:---:|:---:|
-| ![Local Skills](docs/screenshots/en-US/local.jpg) | ![Market](docs/screenshots/en-US/market.jpg) |
+| ![Skill Library](docs/screenshots/en-US/local.jpg) | ![Marketplace](docs/screenshots/en-US/market.jpg) |
 
 | IDE Browser | Projects |
 |:---:|:---:|
 | ![IDE Browser](docs/screenshots/en-US/ide.jpg) | ![Projects](docs/screenshots/en-US/project.jpg) |
 
-## Features
+## Core Features
 
-### Marketplace Search
+### Multi-IDE Skill Management
 
-Search skills from multiple public registries (Claude Plugins, SkillsLLM, SkillsMP) in one unified interface. Download new skills or update existing ones with a single click.
+Every Agent IDE stores skills in its own directory. Qing Skill Manager reads them all, shows you exactly what's installed where, and lets you install, uninstall, or sync from one unified view. Natively supports **Claude Code, Cursor, Codex, OpenCode, OpenClaw** — and you can register any custom IDE in seconds.
 
-### Local Repository
+### Multi-Version Skill Tracking
 
-All downloaded skills are stored centrally at `~/.qing-skill-manager/skills`. Browse, search, filter, and manage your entire skill collection from the Local Skills tab.
+Each skill can have **multiple versions** in your local repository. Compare any two versions side-by-side (file diffs, metadata changes, similarity score). Set a default version, create named **variants** for different use cases (e.g. "concise" vs. "verbose"), and pin a specific version to a specific project. Version history tracks source (marketplace, project import, manual) and creation date.
 
-### One-Click IDE Installation
+### Skill Library with Classification
 
-Install any local skill to one or more IDEs at once. Supports global installation (available everywhere) and project-level cloning (scoped to a specific project).
+The three-column **Skill Library** is the main workspace:
 
-### IDE Browser
+- **Left sidebar** — search, filter by platform (which IDE), filter by status (Managed / Unmanaged / Plugin-Only), sort by name or version count
+- **Center panel** — detailed view of the selected skill: description, path, installation status per IDE, project deployments, quick actions
+- **Right version rail** — full version history, default indicator, per-version IDE and project counts, rename/delete/compare/set-default actions
 
-Switch between IDEs to see what's installed in each one. Uninstall cleanly, or adopt unmanaged skills (ones you placed manually) into your central repository for proper tracking.
+Skills are classified as **Managed** (tracked in your repo), **Unmanaged** (found in an IDE but not in your repo), or **Plugin-Only**. Unmanaged skills can be "adopted" into the central repo with one click.
 
-### Project Management
+### Per-Project Skill Deployment
 
-Register your projects, configure which IDEs each project targets, and deploy skills directly. The app detects existing project skills automatically and flags version conflicts with clear resolution options (keep, overwrite, or coexist).
+Register your projects, configure which IDEs each project uses, and deploy specific skill versions. The app **auto-detects existing skills** in project directories and flags conflicts when a project's version differs from your repo. Conflict resolution offers three choices: **keep** the project version, **overwrite** with the repo version, or **coexist** (rename and keep both).
 
-### Version Management
+### Marketplace Discovery
 
-Track multiple versions of each skill with Git-style version history. Compare versions side-by-side, set defaults, create variants for different use cases, and pin specific versions to specific projects.
-
-### Custom IDE Support
-
-Don't see your IDE? Add a custom IDE by specifying its name and skills directory path. Your custom IDE then works identically to the built-in ones.
+Search skills from **Claude Plugins**, **SkillsLLM**, and **SkillsMP** in one interface. Downloaded skills go straight into your local repository, ready to be installed anywhere. Updates are detected automatically.
 
 ## Supported IDEs
 
-| IDE | Global Path | Project Path |
-|-----|------------|--------------|
+| IDE | Global Skills Path | Project Skills Path |
+|-----|-------------------|-------------------|
 | Claude Code | `~/.claude/skills` | `.claude/skills` |
 | Codex | `~/.codex/skills` | `.codex/skills` |
 | Cursor | `~/.cursor/skills` | `.cursor/skills` |
 | OpenClaw | `~/.openclaw/skills` | `.openclaw/skills` |
 | OpenCode | `~/.config/opencode/skills` | `.opencode/skills` |
 
-Plus any custom IDE you register.
+**+ Any custom IDE** you register (name + skills directory path).
+
+## How It Works
+
+```
+Marketplace / Local folder
+        ↓ download / import
+  Central Repository  (~/.qing-skill-manager/skills)
+        ↓ install (copy)           ↓ clone (copy + version pin)
+  Global IDE directories        Project IDE directories
+  (available everywhere)        (scoped to one project)
+```
+
+1. **Collect** — Download from marketplaces, or import from local folders. Everything lands in the central repository.
+2. **Organize** — Browse your library, manage versions, create variants, classify and filter.
+3. **Distribute** — Install globally to IDEs, or clone specific versions into specific projects.
+4. **Maintain** — The app tracks what's installed where. When versions diverge, it detects conflicts and guides resolution.
 
 ## Getting Started
 
@@ -76,8 +97,8 @@ Plus any custom IDE you register.
 ### Install & Run
 
 ```bash
-git clone <your-fork-url>
-cd skills-manager
+git clone https://github.com/qing-claw/qing-skill-manager.git
+cd qing-skill-manager/skills-manager
 pnpm install
 pnpm tauri dev
 ```
@@ -95,14 +116,6 @@ The app is not yet signed with an Apple Developer certificate. On first launch y
 ```bash
 xattr -dr com.apple.quarantine "/Applications/qing-skill-manager.app"
 ```
-
-## Quick Workflow
-
-1. **Search** — Go to Market, search for a skill, click Download
-2. **Browse** — Switch to Local Skills to see your downloaded collection
-3. **Install** — Click "Install to IDE" and pick your target IDEs
-4. **Project deploy** — In Projects, add your project, configure IDE targets, then link skills
-5. **Stay in sync** — The app detects conflicts when project skills differ from your repo and guides you through resolution
 
 ## Data Sources
 
