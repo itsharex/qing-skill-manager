@@ -1,7 +1,7 @@
 {
   "name": "qing-skill-manager",
   "private": true,
-  "version": "0.3.21",
+  "version": "0.3.22",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,7 @@
     "release": "node \"scripts/release.js\"",
     "test": "npm run test:frontend && npm run test:rust",
     "test:frontend": "npm run test:frontend:logic && npm run typecheck && npm run build:verify",
-    "test:frontend:logic": "node \"src/composables/constants.test.mjs\"",
+    "test:frontend:logic": "node \"src/composables/constants.test.mjs\" && node \"src/composables/useLibraryWorkspace.test.mjs\"",
     "test:rust": "cd src-tauri && cargo test",
     "typecheck": "vue-tsc --noEmit",
     "build:verify": "vite build --mode production",
