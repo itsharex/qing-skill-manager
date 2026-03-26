@@ -198,6 +198,9 @@ function handleToggleAll(checked: boolean): void {
         <div class="group-header">{{ t("library.groupGlobal") }} <span class="group-count">{{ globalSkills.length }}</span></div>
         <article v-for="skill in globalSkills" :key="skill.id" class="card skill-card unmanaged" :class="{ active: selectedSkillId === skill.id }">
           <div class="skill-card-top">
+            <label class="checkbox card-select" @click.stop>
+              <input type="checkbox" :checked="selectedIds.includes(skill.id)" @change="$emit('toggleSelected', skill.id, ($event.target as HTMLInputElement).checked)" />
+            </label>
             <span class="repo-indicator not-in-repo" :title="t('library.notInRepo')">○</span>
             <button class="skill-main" @click="$emit('select', skill)">
               <div class="skill-item-header">
@@ -214,6 +217,9 @@ function handleToggleAll(checked: boolean): void {
         <div class="group-header">{{ t("library.groupProject") }} <span class="group-count">{{ projectSkills.length }}</span></div>
         <article v-for="skill in projectSkills" :key="skill.id" class="card skill-card unmanaged" :class="{ active: selectedSkillId === skill.id }">
           <div class="skill-card-top">
+            <label class="checkbox card-select" @click.stop>
+              <input type="checkbox" :checked="selectedIds.includes(skill.id)" @change="$emit('toggleSelected', skill.id, ($event.target as HTMLInputElement).checked)" />
+            </label>
             <span class="repo-indicator not-in-repo" :title="t('library.notInRepo')">○</span>
             <button class="skill-main" @click="$emit('select', skill)">
               <div class="skill-item-header">
