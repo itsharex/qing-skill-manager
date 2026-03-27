@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.26](https://github.com/qing-claw/qing-skill-manager/compare/v0.3.25...v0.3.26) (2026-03-27)
+
+
+### Bug Fixes
+
+* prevent build-windows phantom failures on push events ([bfaeb83](https://github.com/qing-claw/qing-skill-manager/commit/bfaeb8300a5cc427c6cea806c4e95ab0b8485018))
+* repair CI pipeline and configure Tauri updater signing ([4427ca4](https://github.com/qing-claw/qing-skill-manager/commit/4427ca4b8496cb887e14fb7d26591a088d2860e3))
+
 ### [0.3.21](https://github.com/Rito-w/skills-manager/compare/v0.3.20...v0.3.21) (2026-03-18)
 
 

@@ -1,6 +1,6 @@
 [package]
 name = "qing-skill-manager"
-version = "0.3.25"
+version = "0.3.26"
 description = "Qing Skill Manager desktop app"
 authors = ["qing-claw"]
 edition = "2021"
