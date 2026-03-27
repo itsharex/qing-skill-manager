@@ -5,3 +5,4 @@ node_modules
 /references
 /others
 skills-manager.key
+.worktrees/
