@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "./useToast";
 import { useIdeConfig } from "./useIdeConfig";
@@ -14,10 +14,19 @@ import { useVersionManagement } from "./useVersionManagement";
 import { useLibraryWorkspace } from "./useLibraryWorkspace";
 import { useProjectConfig } from "./useProjectConfig";
 import { useProjectSnapshots } from "./useProjectSnapshots";
+import type { AppContext } from "./useAppContext";
 
 export function useSkillsManager() {
   const { t } = useI18n();
   const toast = useToast();
+
+  // Shared context object passed to sub-composables instead of individual callbacks.
+  // scanLocalSkills is initially a no-op; it's assigned after useLocalInventory returns.
+  const ctx: AppContext = {
+    toast: { success: (msg: string) => toast.success(msg), error: (msg: string) => toast.error(msg) },
+    t,
+    scanLocalSkills: () => Promise.resolve(false),
+  };
 
   const activeTab = ref<"local" | "market" | "ide" | "projects" | "settings" | "library">("local");
   const updatingId = ref<string | null>(null);
@@ -65,7 +74,10 @@ export function useSkillsManager() {
     scanLocalSkills,
     importLocalSkill: importLocalSkillInternal,
     openSkillDirectory: openSkillDirectoryInternal
-  } = useLocalInventory(ideOptions, projectPaths, (msg) => toast.success(msg), (msg) => toast.error(msg), t);
+  } = useLocalInventory(ideOptions, projectPaths, ctx);
+
+  // Now that scanLocalSkills is available, wire it into the shared context
+  ctx.scanLocalSkills = scanLocalSkills;
 
   const {
     downloadQueue,
@@ -76,7 +88,7 @@ export function useSkillsManager() {
     downloadSkill,
     updateSkill,
     cleanup: cleanupDownloadQueue
-  } = useDownloadQueue((msg) => toast.success(msg), t, scanLocalSkills);
+  } = useDownloadQueue(ctx);
 
   const {
     showInstallModal,
@@ -88,7 +100,7 @@ export function useSkillsManager() {
     updateInstallTargetIde,
     closeInstallModal,
     confirmInstallToIde
-  } = useInstallActions(ideOptions, (msg) => toast.success(msg), (msg) => toast.error(msg), scanLocalSkills, t);
+  } = useInstallActions(ideOptions, ctx);
 
   const {
     showUninstallModal,
@@ -100,15 +112,18 @@ export function useSkillsManager() {
     openUninstallManyModal,
     openDeleteLocalModal,
     confirmUninstall,
-    cancelUninstall
-  } = useUninstallActions(ideOptions, (msg) => toast.success(msg), (msg) => toast.error(msg), scanLocalSkills, t);
+    cancelUninstall,
+    uninstallFromLibrary
+  } = useUninstallActions(ideOptions, ctx, projectPaths);
 
   const {
     busy: adoptionBusy,
     busyText: adoptionBusyText,
     adoptIdeSkill,
-    adoptManyIdeSkills
-  } = useIdeAdoption((msg) => toast.success(msg), (msg) => toast.error(msg), scanLocalSkills, t);
+    adoptManyIdeSkills,
+    adoptToRepo,
+    adoptManyToRepo
+  } = useIdeAdoption(ctx);
 
   const {
     projectSkillScanResult,
@@ -120,7 +135,7 @@ export function useSkillsManager() {
     resolveConflict,
     openConflictModal,
     closeConflictModal
-  } = useProjectScan((msg) => toast.success(msg), (msg) => toast.error(msg), t);
+  } = useProjectScan(ctx);
 
   const {
     currentSkillPackage,
@@ -154,8 +169,10 @@ export function useSkillsManager() {
     versionImportProjectSkills,
     versionImportProjectSkillsLoading,
     setComparisonVersions,
-    setVersionImportProject
-  } = useVersionManagement((msg) => toast.success(msg), (msg) => toast.error(msg), scanLocalSkills, t);
+    setVersionImportProject,
+    pickSourcePath,
+    pickVersionImportProject
+  } = useVersionManagement(ctx);
 
   const {
     projects,
@@ -256,123 +273,145 @@ export function useSkillsManager() {
   });
 
   return {
+    // Cross-domain state
     activeTab,
-    query,
-    results,
-    total,
-    limit,
-    offset,
-    loading,
-    installingId,
-    updatingId,
-    localSkills,
-    ideSkills,
-    localLoading,
-    ideOptions,
-    selectedIdeFilter,
-    customIdeName,
-    customIdeDir,
-    showInstallModal,
-    installTargetIde,
-    showUninstallModal,
-    uninstallTargetName,
     busy,
     busyText,
-    hasMore,
-    localSkillNameSet,
-    filteredIdeSkills,
-    customIdeOptions,
-    marketConfigs,
-    marketStatuses,
-    enabledMarkets,
-    downloadQueue,
-    uninstallMode,
-    recentTaskStatus,
-    projectSkillScanResult,
-    showConflictModal,
-    currentConflictSkill,
-    currentSkillPackage,
-    showVersionManagerModal,
-    versionLoading,
-    currentConflictAnalysis,
-    showVersionDiffModal,
-    currentVersionDiff,
-    refreshIdeOptions,
-    addCustomIde,
-    removeCustomIde,
-    saveMarketConfigs,
-    searchMarketplace,
-    downloadSkill,
-    updateSkill,
-    scanLocalSkills,
-    openInstallModal,
-    updateInstallTargetIde,
-    confirmInstallToIde,
-    closeInstallModal,
-    openUninstallModal,
-    openUninstallManyModal,
-    openDeleteLocalModal,
-    confirmUninstall,
-    cancelUninstall,
-    importLocalSkill,
-    openSkillDirectory,
-    adoptIdeSkill,
-    adoptManyIdeSkills,
-    addToDownloadQueue,
-    removeFromQueue,
-    retryDownload,
-    scanProjectSkills,
-    resolveConflict,
-    openConflictModal,
-    closeConflictModal,
-    loadSkillPackage,
-    compareVersions,
-    createVersion,
-    analyzeConflict,
-    renameVersion,
-    deleteVersion,
-    setDefaultVersion,
-    createVariant,
-    updateVariant,
-    deleteVariant,
-    openVersionManagerModal,
-    closeVersionManagerModal,
-    openVersionDiffModal,
-    closeVersionDiffModal,
-    comparingFromVersion,
-    comparingToVersion,
-    currentDiff,
-    currentManagedSkillPath,
-    selectedCreateVersionSourcePath,
-    versionImportProjectId,
-    versionImportProjectSkills,
-    versionImportProjectSkillsLoading,
-    setComparisonVersions,
-    setVersionImportProject,
-    projects,
-    selectedProjectId,
-    loadProjects,
-    addProject,
-    removeProject,
-    updateProjectIdeTargets,
-    updateDetectedIdeDirs,
-    getProjectLinkTargets,
-    projectSkillSnapshots,
-    refreshProjectSkillSnapshots,
-    restartProjectSnapshotRefreshLoop,
-    platformFilter,
-    librarySearchQuery,
-    statusFilter,
-    selectedLibrarySkillId,
-    libraryLoading,
-    platformOptions,
-    librarySkills,
-    filteredSkills,
-    selectedLibrarySkill,
-    selectSkill,
-    setPlatformFilter,
-    setLibrarySearchQuery,
-    setStatusFilter,
-    clearFilters
+
+    // Domain groups
+    market: reactive({
+      query,
+      results,
+      total,
+      limit,
+      offset,
+      loading,
+      hasMore,
+      marketConfigs,
+      marketStatuses,
+      enabledMarkets,
+      searchMarketplace,
+      saveMarketConfigs,
+      downloadSkill,
+      updateSkill,
+      downloadQueue,
+      recentTaskStatus,
+      retryDownload,
+      removeFromQueue,
+      addToDownloadQueue,
+    }),
+    library: reactive({
+      localSkills,
+      ideSkills,
+      localLoading,
+      localSkillNameSet,
+      scanLocalSkills,
+      importLocalSkill,
+      openSkillDirectory,
+      platformFilter,
+      librarySearchQuery,
+      statusFilter,
+      selectedLibrarySkillId,
+      libraryLoading,
+      platformOptions,
+      librarySkills,
+      filteredSkills,
+      selectedLibrarySkill,
+      selectSkill,
+      setPlatformFilter,
+      setLibrarySearchQuery,
+      setStatusFilter,
+      clearFilters,
+    }),
+    ide: reactive({
+      ideOptions,
+      selectedIdeFilter,
+      customIdeName,
+      customIdeDir,
+      customIdeOptions,
+      filteredIdeSkills,
+      refreshIdeOptions,
+      addCustomIde,
+      removeCustomIde,
+      adoptIdeSkill,
+      adoptManyIdeSkills,
+      adoptToRepo,
+      adoptManyToRepo,
+    }),
+    install: reactive({
+      showInstallModal,
+      installTargetIde,
+      installingId,
+      updatingId,
+      openInstallModal,
+      updateInstallTargetIde,
+      closeInstallModal,
+      confirmInstallToIde,
+    }),
+    uninstall: reactive({
+      showUninstallModal,
+      uninstallTargetName,
+      uninstallMode,
+      openUninstallModal,
+      openUninstallManyModal,
+      openDeleteLocalModal,
+      confirmUninstall,
+      cancelUninstall,
+      uninstallFromLibrary,
+    }),
+    version: reactive({
+      currentSkillPackage,
+      showVersionManagerModal,
+      versionLoading,
+      currentConflictAnalysis,
+      showVersionDiffModal,
+      currentVersionDiff,
+      loadSkillPackage,
+      compareVersions,
+      createVersion,
+      analyzeConflict,
+      renameVersion,
+      deleteVersion,
+      setDefaultVersion,
+      createVariant,
+      updateVariant,
+      deleteVariant,
+      openVersionManagerModal,
+      closeVersionManagerModal,
+      openVersionDiffModal,
+      closeVersionDiffModal,
+      comparingFromVersion,
+      comparingToVersion,
+      currentDiff,
+      currentManagedSkillPath,
+      selectedCreateVersionSourcePath,
+      versionImportProjectId,
+      versionImportProjectSkills,
+      versionImportProjectSkillsLoading,
+      setComparisonVersions,
+      setVersionImportProject,
+      pickSourcePath,
+      pickVersionImportProject,
+    }),
+    project: reactive({
+      projects,
+      selectedProjectId,
+      loadProjects,
+      addProject,
+      removeProject,
+      updateProjectIdeTargets,
+      updateDetectedIdeDirs,
+      getProjectLinkTargets,
+      projectSkillSnapshots,
+      refreshProjectSkillSnapshots,
+      restartProjectSnapshotRefreshLoop,
+      projectSkillScanResult,
+      scanProjectSkills,
+      showConflictModal,
+      currentConflictSkill,
+      resolveConflict,
+      openConflictModal,
+      closeConflictModal,
+    }),
   };
 }

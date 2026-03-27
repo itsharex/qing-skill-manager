@@ -1,6 +1,6 @@
 use super::{
     build_skill_version, collect_ide_skills, collect_plugin_skills, collect_skills_from_dir,
-    read_skill_metadata, remove_path, skill_content_hash,
+    read_skill_metadata, skill_content_hash,
     InstalledSkillSidecar, now_timestamp, write_install_sidecar,
 };
 use crate::types::{
@@ -10,7 +10,7 @@ use crate::types::{
     SkillVersionSource, ScanProjectSkillsRequest, UninstallRequest,
 };
 use crate::utils::download::copy_dir_recursive;
-use crate::utils::path::{normalize_path, resolve_canonical, sanitize_dir_name};
+use crate::utils::path::{normalize_path, resolve_canonical, resolve_or_normalize, sanitize_dir_name};
 use crate::utils::security::{is_absolute_ide_path, is_valid_ide_path};
 use std::path::{Path, PathBuf};
 use std::fs;
@@ -21,7 +21,7 @@ pub fn clone_local_skill(request: InstallRequest) -> Result<InstallResult, Strin
     let normalized_home = normalize_path(&home);
     let manager_root_raw = home.join(".qing-skill-manager/skills");
     let manager_root =
-        resolve_canonical(&manager_root_raw).unwrap_or_else(|| normalize_path(&manager_root_raw));
+        resolve_or_normalize(&manager_root_raw);
 
     let skill_path = PathBuf::from(&request.skill_path);
     let skill_canon = resolve_canonical(&skill_path)
@@ -122,31 +122,52 @@ pub fn scan_overview(request: LocalScanRequest) -> Result<Overview, String> {
     // Build version hash map: content_hash → (version_id, skill_id)
     // This enables matching IDE skills to specific versions
     // Also update version_count from loaded packages (collect_skills_from_dir only sets 0 or 1)
+    //
+    // Performance: build packages from the already-scanned manager_skills instead of
+    // calling get_skill_package (which re-scans the directory) for each skill.
     let mut version_hash_map = std::collections::HashMap::new();
-    for i in 0..manager_skills.len() {
-        let (skill_id, content_hash) = match &manager_skills[i].current_version {
+
+    // Pre-build packages per unique skill_id from already-scanned data (single pass)
+    let mut package_cache: std::collections::HashMap<String, crate::types::SkillPackage> =
+        std::collections::HashMap::new();
+    {
+        let mut seen_ids = std::collections::HashSet::new();
+        for skill in manager_skills.iter() {
+            if let Some(v) = &skill.current_version {
+                if seen_ids.insert(v.skill_id.clone()) {
+                    if let Some(pkg) = super::package_from_scanned_skills(
+                        &home,
+                        &v.skill_id,
+                        &manager_skills,
+                    ) {
+                        package_cache.insert(v.skill_id.clone(), pkg);
+                    }
+                }
+            }
+        }
+    }
+
+    for skill in &mut manager_skills {
+        let (skill_id, content_hash) = match &skill.current_version {
             Some(v) => (v.skill_id.clone(), v.content_hash.clone()),
             None => continue,
         };
         version_hash_map.entry(content_hash.clone())
             .or_insert_with(|| {
-                let v = manager_skills[i].current_version.as_ref().unwrap();
+                let v = skill.current_version.as_ref().unwrap();
                 (v.id.clone(), v.skill_id.clone())
             });
-        // Load full package to match against all versions, get real version count,
-        // and update current_version to the default version from the package
-        if let Ok(pkg) = super::version::get_skill_package(
-            crate::types::GetSkillPackageRequest { skill_id }
-        ) {
-            let active_count = pkg.package.versions.iter().filter(|v| v.is_active).count();
-            manager_skills[i].version_count = active_count;
+        // Use pre-built package to get real version count and default version
+        if let Some(pkg) = package_cache.get(&skill_id) {
+            let active_count = pkg.versions.iter().filter(|v| v.is_active).count();
+            skill.version_count = active_count;
             // Use the default version's info so the sidebar shows the correct default name
-            if let Some(default_ver) = pkg.package.versions.iter()
-                .find(|v| v.id == pkg.package.default_version && v.is_active)
+            if let Some(default_ver) = pkg.versions.iter()
+                .find(|v| v.id == pkg.default_version && v.is_active)
             {
-                manager_skills[i].current_version = Some(default_ver.clone());
+                skill.current_version = Some(default_ver.clone());
             }
-            for v in &pkg.package.versions {
+            for v in &pkg.versions {
                 version_hash_map.entry(v.content_hash.clone())
                     .or_insert((v.id.clone(), v.skill_id.clone()));
             }
@@ -275,15 +296,18 @@ pub fn uninstall_skill(request: UninstallRequest) -> Result<String, String> {
     }
 
     let target = PathBuf::from(&request.target_path);
-    let parent = target.parent().unwrap_or(Path::new(&request.target_path));
-    let parent_canon = resolve_canonical(parent).unwrap_or_else(|| normalize_path(parent));
+    // Reject symlinks to prevent following links outside allowed directories
+    if target.is_symlink() {
+        return Err("Cannot uninstall a symbolic link target".to_string());
+    }
+    let target_canon = resolve_or_normalize(&target);
     let allowed_roots_canon: Vec<PathBuf> = allowed_roots
         .iter()
-        .map(|root| resolve_canonical(root).unwrap_or_else(|| normalize_path(root)))
+        .map(|root| resolve_or_normalize(root))
         .collect();
     let allowed = allowed_roots_canon
         .iter()
-        .any(|root| parent_canon.starts_with(root));
+        .any(|root| target_canon.starts_with(root));
     if !allowed {
         return Err("Target path is outside the allowed directories".to_string());
     }
@@ -311,6 +335,12 @@ pub fn import_local_skill(request: ImportRequest) -> Result<String, String> {
     let target_dir = manager_dir.join(&safe_name);
 
     if target_dir.exists() {
+        if request.overwrite {
+            fs::remove_dir_all(&target_dir).map_err(|err| err.to_string())?;
+            fs::create_dir_all(&target_dir).map_err(|err| err.to_string())?;
+            copy_dir_recursive(&source_path, &target_dir)?;
+            return Ok(format!("Updated skill: {}", name));
+        }
         // Already managed — not an error during adopt
         return Ok(format!("Skill already managed: {}", name));
     }
@@ -372,8 +402,39 @@ pub fn adopt_ide_skill(request: AdoptIdeSkillRequest) -> Result<String, String> 
         copy_dir_recursive(source_dir, &manager_target)?;
     }
 
-    remove_path(&target)?;
-    copy_dir_recursive(&manager_target, &target)?;
+    // Atomic restore: back up existing IDE skill before replacing it.
+    // If copy fails, restore from backup to prevent data loss.
+    let backup_path = target.with_extension("_adopt_backup");
+    fs::rename(&target, &backup_path).map_err(|err| {
+        format!("Failed to create backup of IDE skill: {}", err)
+    })?;
+
+    match copy_dir_recursive(&manager_target, &target) {
+        Ok(()) => {
+            // Copy succeeded — remove the backup
+            let _ = fs::remove_dir_all(&backup_path);
+        }
+        Err(err) => {
+            // Copy failed — restore from backup
+            let _ = fs::remove_dir_all(&target); // clean partial copy
+            if let Err(restore_err) = fs::rename(&backup_path, &target) {
+                return Err(format!(
+                    "Failed to restore IDE skill from backup after copy error: {}. Original error: {}",
+                    restore_err, err
+                ));
+            }
+            return Err(format!("Failed to restore IDE skill from manager: {}", err));
+        }
+    }
+
+    // Write install sidecar so the next scan identifies this as a managed/synced skill
+    let version = build_skill_version(&manager_target, SkillVersionSource::Clone);
+    let _ = write_install_sidecar(&target, &InstalledSkillSidecar {
+        version_id: Some(version.id),
+        content_hash: Some(version.content_hash),
+        installed_at: Some(now_timestamp()),
+        source_skill_id: Some(version.skill_id),
+    });
 
     Ok(format!(
         "Managed {} and restored a local copy for {}",
@@ -384,34 +445,49 @@ pub fn adopt_ide_skill(request: AdoptIdeSkillRequest) -> Result<String, String> 
 #[tauri::command]
 pub fn delete_local_skills(request: DeleteLocalSkillRequest) -> Result<String, String> {
     let home = dirs::home_dir().ok_or("Unable to determine the home directory")?;
-    let manager_root = resolve_canonical(&home.join(".qing-skill-manager/skills"))
-        .unwrap_or_else(|| normalize_path(&home.join(".qing-skill-manager/skills")));
+    let manager_root = resolve_or_normalize(&home.join(".qing-skill-manager/skills"));
 
     if request.target_paths.is_empty() {
         return Err("No skills were provided for deletion".to_string());
     }
 
     let mut deleted = 0usize;
+    let mut failed = Vec::new();
 
-    for raw_path in request.target_paths {
-        let target = PathBuf::from(&raw_path);
-        let canonical =
-            resolve_canonical(&target).ok_or_else(|| "Target skill does not exist".to_string())?;
+    for raw_path in &request.target_paths {
+        let target = PathBuf::from(raw_path);
+        let canonical = match resolve_canonical(&target) {
+            Some(c) => c,
+            None => {
+                failed.push(format!("{}: does not exist", raw_path));
+                continue;
+            }
+        };
         if !canonical.starts_with(&manager_root) {
-            return Err("Only Qing Skill Manager local skills can be deleted".to_string());
+            failed.push(format!("{}: outside managed directory", raw_path));
+            continue;
         }
         if canonical == manager_root {
-            return Err("Refusing to delete the skills root directory".to_string());
+            failed.push(format!("{}: refusing to delete skills root", raw_path));
+            continue;
         }
         if !canonical.join("SKILL.md").exists() {
-            return Err("Refusing to delete a directory without SKILL.md".to_string());
+            failed.push(format!("{}: missing SKILL.md", raw_path));
+            continue;
         }
-
-        fs::remove_dir_all(&canonical).map_err(|err| err.to_string())?;
-        deleted += 1;
+        match fs::remove_dir_all(&canonical) {
+            Ok(()) => deleted += 1,
+            Err(e) => failed.push(format!("{}: {}", raw_path, e)),
+        }
     }
 
-    Ok(format!("Deleted {} skills", deleted))
+    if failed.is_empty() {
+        Ok(format!("Deleted {} skill(s)", deleted))
+    } else if deleted > 0 {
+        Ok(format!("Deleted {} skill(s), {} failed: {}", deleted, failed.len(), failed.join("; ")))
+    } else {
+        Err(format!("All deletions failed: {}", failed.join("; ")))
+    }
 }
 
 #[tauri::command]

@@ -29,7 +29,8 @@ export default {
     title: "Settings",
     about: {
       title: "About",
-      version: "Version"
+      version: "Version",
+      sponsor: "Sponsor"
     },
     appearance: {
       title: "Appearance",
@@ -155,6 +156,7 @@ export default {
     uninstalling: "Uninstalling...",
     uninstalledCount: "Uninstalled {count} skills",
     uninstalledPartial: "Successfully uninstalled {success}, failed {failed}",
+    installedPartial: "Installed {installed}, {failed} failed",
     adoptedCount: "Managed {count} skills",
     adoptedPartial: "Successfully managed {success}, failed {failed}",
     deleting: "Deleting...",

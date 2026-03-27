@@ -3,15 +3,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { homeDir, join } from "@tauri-apps/api/path";
 import type { ProjectSkill, ProjectSkillScanResult, ConflictResolution, ResolveConflictResult } from "./types";
 import { getErrorMessage } from "./utils";
-
-export type ToastFunction = (message: string) => void;
-export type ErrorToastFunction = (message: string) => void;
-export type TranslateFunction = (key: string, values?: Record<string, string | number>) => string;
+import type { AppContext } from "./useAppContext";
 
 export function useProjectScan(
-  onSuccess: ToastFunction,
-  onError: ErrorToastFunction,
-  t: TranslateFunction
+  ctx: AppContext
 ) {
   const projectSkillScanResult = ref<ProjectSkillScanResult | null>(null);
   const showConflictModal = ref(false);
@@ -28,7 +23,7 @@ export function useProjectScan(
     const silent = options?.silent === true;
     if (!silent) {
       busy.value = true;
-      busyText.value = t("messages.scanningProject");
+      busyText.value = ctx.t("messages.scanningProject");
     }
 
     try {
@@ -43,7 +38,7 @@ export function useProjectScan(
       return result;
     } catch (err) {
       if (!silent) {
-        onError(getErrorMessage(err, t("errors.scanProjectFailed")));
+        ctx.toast.error(getErrorMessage(err, ctx.t("errors.scanProjectFailed")));
       }
       return null;
     } finally {
@@ -56,7 +51,7 @@ export function useProjectScan(
 
   async function resolveConflict(skill: ProjectSkill, resolution: ConflictResolution, coexistName?: string): Promise<boolean> {
     busy.value = true;
-    busyText.value = t("messages.resolvingConflict");
+    busyText.value = ctx.t("messages.resolvingConflict");
     try {
       const result = await invoke("resolve_skill_conflict", {
         request: {
@@ -67,7 +62,7 @@ export function useProjectScan(
       }) as ResolveConflictResult;
 
       if (result.success) {
-        onSuccess(t("messages.conflictResolved", { action: result.action }));
+        ctx.toast.success(ctx.t("messages.conflictResolved", { action: result.action }));
         if (projectSkillScanResult.value) {
           const skillIndex = projectSkillScanResult.value.skills.findIndex((item) => item.path === skill.path);
           if (skillIndex !== -1) {
@@ -77,10 +72,10 @@ export function useProjectScan(
         return true;
       }
 
-      onError(t("errors.resolveConflictFailed"));
+      ctx.toast.error(ctx.t("errors.resolveConflictFailed"));
       return false;
     } catch (err) {
-      onError(getErrorMessage(err, t("errors.resolveConflictFailed")));
+      ctx.toast.error(getErrorMessage(err, ctx.t("errors.resolveConflictFailed")));
       return false;
     } finally {
       busy.value = false;

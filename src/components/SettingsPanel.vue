@@ -108,10 +108,16 @@ onMounted(async () => {
       <div class="about-content">
         <div class="app-info">
           <span class="app-name">Qing Skill Manager</span>
-          <span class="version-badge">v0.3.21</span>
+          <span class="version-badge">v0.3.25</span>
         </div>
 
-        <div class="about-actions"></div>
+        <!-- Sponsor -->
+        <div class="sponsor-section">
+          <span class="sponsor-label">{{ t("settings.about.sponsor") }}</span>
+          <div class="sponsor-logo-wrap">
+            <img src="../assets/sponsor-logo.svg" alt="Sponsor" class="sponsor-logo" />
+          </div>
+        </div>
       </div>
     </section>
 
@@ -276,15 +282,39 @@ onMounted(async () => {
   color: var(--color-muted);
 }
 
-.about-actions {
+.sponsor-section {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-panel-border);
 }
 
-.about-actions .ghost {
-  display: inline-flex;
+.sponsor-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sponsor-logo-wrap {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  padding: 8px;
+}
+
+.sponsor-logo {
+  width: 80px;
+  height: auto;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.sponsor-logo:hover {
+  opacity: 1;
 }
 
 /* Appearance Section */

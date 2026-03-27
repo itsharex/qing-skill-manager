@@ -4,17 +4,14 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { dirname } from "@tauri-apps/api/path";
 import type { LocalSkill, IdeSkill, IdeOption } from "./types";
 import { getErrorMessage, validateOverviewResponse } from "./utils";
+import type { AppContext } from "./useAppContext";
 
-export type ToastFunction = (message: string) => void;
 export type ProgressFunction = (busy: boolean, text: string) => void;
-export type TranslateFunction = (key: string, values?: Record<string, string | number>) => string;
 
 export function useLocalInventory(
   ideOptions: { value: IdeOption[] },
   projectPaths: { value: string[] },
-  onSuccess: ToastFunction,
-  onError: ToastFunction,
-  t: TranslateFunction
+  ctx: AppContext
 ) {
   const localSkills = ref<LocalSkill[]>([]);
   const ideSkills = ref<IdeSkill[]>([]);
@@ -47,7 +44,7 @@ export function useLocalInventory(
       const validation = validateOverviewResponse(response);
       if (!validation.success) {
         console.error("[scanLocalSkills] Invalid response:", validation.error, response);
-        onError(`${t("errors.scanFailed")}: ${validation.error}`);
+        ctx.toast.error(`${ctx.t("errors.scanFailed")}: ${validation.error}`);
         return false;
       }
 
@@ -56,7 +53,7 @@ export function useLocalInventory(
       return true;
     } catch (err) {
       console.error("[scanLocalSkills] Error:", err);
-      onError(getErrorMessage(err, t("errors.scanFailed")));
+      ctx.toast.error(getErrorMessage(err, ctx.t("errors.scanFailed")));
       return false;
     } finally {
       localLoading.value = false;
@@ -69,14 +66,14 @@ export function useLocalInventory(
       const selected = await open({
         directory: true,
         multiple: true,
-        title: t("local.selectSkillDir")
+        title: ctx.t("local.selectSkillDir")
       });
 
       if (!selected) return;
       const paths = Array.isArray(selected) ? selected : [selected];
       if (paths.length === 0) return;
 
-      onProgress(true, t("messages.importing"));
+      onProgress(true, ctx.t("messages.importing"));
 
       let successCount = 0;
       let failCount = 0;
@@ -98,13 +95,13 @@ export function useLocalInventory(
 
       if (successCount > 0) {
         if (failCount > 0) {
-          onError(t("messages.imported", { success: successCount, failed: failCount }));
+          ctx.toast.error(ctx.t("messages.imported", { success: successCount, failed: failCount }));
         } else {
-          onSuccess(t("messages.imported", { success: successCount, failed: 0 }));
+          ctx.toast.success(ctx.t("messages.imported", { success: successCount, failed: 0 }));
         }
       } else {
-        onError(
-          t("messages.imported", { success: 0, failed: failCount }) +
+        ctx.toast.error(
+          ctx.t("messages.imported", { success: 0, failed: failCount }) +
           (paths.length === 1 ? `: ${lastError}` : "")
         );
       }
@@ -114,7 +111,7 @@ export function useLocalInventory(
         console.warn("[importLocalSkill] scanLocalSkills failed after import");
       }
     } catch (err) {
-      onError(getErrorMessage(err, t("errors.importFailed")));
+      ctx.toast.error(getErrorMessage(err, ctx.t("errors.importFailed")));
     } finally {
       onProgress(false, "");
     }
@@ -124,16 +121,16 @@ export function useLocalInventory(
     try {
       await revealItemInDir(path);
     } catch (err) {
-      const message = getErrorMessage(err, t("errors.openDirFailed"));
+      const message = getErrorMessage(err, ctx.t("errors.openDirFailed"));
       if (message.includes("os error 2") || message.toLowerCase().includes("cannot find the file")) {
         try {
           await revealItemInDir(await dirname(path));
-          onError(t("errors.openDirFailed") + ": " + path);
+          ctx.toast.error(ctx.t("errors.openDirFailed") + ": " + path);
           return;
         } catch {
         }
       }
-      onError(message);
+      ctx.toast.error(message);
     }
   }
 

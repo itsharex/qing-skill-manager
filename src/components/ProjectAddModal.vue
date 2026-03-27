@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import BaseModal from "./BaseModal.vue";
 
 const { t } = useI18n();
 
@@ -24,7 +25,7 @@ async function handleSelectFolder() {
       multiple: false,
       title: t("projects.selectFolder")
     });
-    
+
     if (selected && typeof selected === "string") {
       projectPath.value = selected;
       // Extract folder name from path
@@ -52,121 +53,49 @@ function handleClose() {
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="modal-fade">
-      <div v-if="visible" class="modal-overlay" @click.self="handleClose">
-        <div class="modal">
-          <div class="modal-header">
-            <h2 class="modal-title">{{ t("projects.addTitle") }}</h2>
-            <button class="modal-close" @click="handleClose">×</button>
-          </div>
-
-          <div class="modal-body">
-            <div class="form-group">
-              <label class="form-label">{{ t("projects.projectPath") }}</label>
-              <div class="input-with-button">
-                <input
-                  v-model="projectPath"
-                  class="input"
-                  :placeholder="t('projects.pathPlaceholder')"
-                  readonly
-                />
-                <button class="icon-button" @click="handleSelectFolder" type="button">
-                  {{ t("projects.selectFolderButton") }}
-                </button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">{{ t("projects.projectName") }}</label>
-              <input
-                v-model="projectName"
-                class="input"
-                :placeholder="t('projects.namePlaceholder')"
-              />
-            </div>
-
-            <div class="hint">
-              {{ t("projects.addHint") }}
-            </div>
-          </div>
-
-          <div class="modal-footer">
-            <button class="ghost" @click="handleClose">{{ t("projects.cancel") }}</button>
-            <button
-              class="primary"
-              :disabled="!projectPath.trim() || !projectName.trim()"
-              @click="handleConfirm"
-            >
-              {{ t("projects.add") }}
-            </button>
-          </div>
-        </div>
+  <BaseModal :show="visible" :title="t('projects.addTitle')" @close="handleClose">
+    <div class="form-group">
+      <label class="form-label">{{ t("projects.projectPath") }}</label>
+      <div class="input-with-button">
+        <input
+          v-model="projectPath"
+          class="input"
+          :placeholder="t('projects.pathPlaceholder')"
+          readonly
+        />
+        <button class="icon-button" @click="handleSelectFolder" type="button">
+          {{ t("projects.selectFolderButton") }}
+        </button>
       </div>
-    </Transition>
-  </Teleport>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">{{ t("projects.projectName") }}</label>
+      <input
+        v-model="projectName"
+        class="input"
+        :placeholder="t('projects.namePlaceholder')"
+      />
+    </div>
+
+    <div class="hint">
+      {{ t("projects.addHint") }}
+    </div>
+
+    <template #footer>
+      <button class="ghost" @click="handleClose">{{ t("projects.cancel") }}</button>
+      <button
+        class="primary"
+        :disabled="!projectPath.trim() || !projectName.trim()"
+        @click="handleConfirm"
+      >
+        {{ t("projects.add") }}
+      </button>
+    </template>
+  </BaseModal>
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--color-overlay-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
-.modal {
-  background: var(--color-panel-bg);
-  border-radius: 12px;
-  max-width: 500px;
-  width: 100%;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--color-panel-border);
-}
-
-.modal-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin: 0;
-}
-
-.modal-close {
-  background: transparent;
-  border: none;
-  font-size: 28px;
-  color: var(--color-muted);
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: background 0.2s ease;
-}
-
-.modal-close:hover {
-  background: var(--color-tabs-bg);
-  color: var(--color-text);
-}
-
-.modal-body {
-  padding: 24px;
-}
-
 .form-group {
   margin-bottom: 20px;
 }
@@ -227,23 +156,5 @@ function handleClose() {
   background: var(--color-primary-active);
   border-color: var(--color-primary-active);
   color: var(--color-primary-text);
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 20px 24px;
-  border-top: 1px solid var(--color-panel-border);
-}
-
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-  opacity: 0;
 }
 </style>

@@ -2,18 +2,12 @@ import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { LocalSkill, IdeOption } from "./types";
 import { getErrorMessage } from "./utils";
-
-export type ToastFunction = (message: string) => void;
-export type ErrorToastFunction = (message: string) => void;
-export type ScanLocalSkillsFunction = () => Promise<boolean>;
-export type TranslateFunction = (key: string, values?: Record<string, string | number>) => string;
+import type { AppContext } from "./useAppContext";
 
 export function useUninstallActions(
   ideOptions: { value: IdeOption[] },
-  onSuccess: ToastFunction,
-  onError: ErrorToastFunction,
-  scanLocalSkills: ScanLocalSkillsFunction,
-  t: TranslateFunction
+  ctx: AppContext,
+  projectPaths?: { value: string[] }
 ) {
   const showUninstallModal = ref(false);
   const uninstallTargetPath = ref("");
@@ -36,7 +30,7 @@ export function useUninstallActions(
     uninstallMode.value = "ide";
     uninstallTargetPath.value = "";
     uninstallTargetPaths.value = paths;
-    uninstallTargetName.value = t("ide.uninstallSelectedCount", { count: paths.length });
+    uninstallTargetName.value = ctx.t("ide.uninstallSelectedCount", { count: paths.length });
     showUninstallModal.value = true;
   }
 
@@ -45,13 +39,13 @@ export function useUninstallActions(
     uninstallTargetPath.value = "";
     uninstallTargetPaths.value = targets.map((skill) => skill.path);
     uninstallTargetName.value =
-      targets.length === 1 ? targets[0].name : t("local.deleteSelectedCount", { count: targets.length });
+      targets.length === 1 ? targets[0].name : ctx.t("local.deleteSelectedCount", { count: targets.length });
     showUninstallModal.value = true;
   }
 
   async function confirmUninstall(): Promise<void> {
     busy.value = true;
-    busyText.value = uninstallMode.value === "local" ? t("messages.deleting") : t("messages.uninstalling");
+    busyText.value = uninstallMode.value === "local" ? ctx.t("messages.deleting") : ctx.t("messages.uninstalling");
     try {
       if (uninstallMode.value === "local") {
         const message = (await invoke("delete_local_skills", {
@@ -59,7 +53,7 @@ export function useUninstallActions(
             targetPaths: uninstallTargetPaths.value
           }
         })) as string;
-        onSuccess(message);
+        ctx.toast.success(message);
       } else {
         let successCount = 0;
         let failCount = 0;
@@ -67,10 +61,15 @@ export function useUninstallActions(
 
         for (const targetPath of uninstallTargetPaths.value) {
           try {
+            // Determine project dir for this path
+            let projectDir: string | null = null;
+            if (projectPaths?.value) {
+              projectDir = projectPaths.value.find(p => targetPath.startsWith(p)) ?? null;
+            }
             await invoke("uninstall_skill", {
               request: {
                 targetPath,
-                projectDir: null,
+                projectDir,
                 ideDirs: ideOptions.value.map((item) => ({
                   label: item.label,
                   relativeDir: item.globalDir
@@ -85,26 +84,26 @@ export function useUninstallActions(
         }
 
         if (successCount > 0 && failCount === 0) {
-          onSuccess(t("messages.uninstalledCount", { count: successCount }));
+          ctx.toast.success(ctx.t("messages.uninstalledCount", { count: successCount }));
         } else if (successCount > 0 && failCount > 0) {
-          onError(t("messages.uninstalledPartial", { success: successCount, failed: failCount }));
+          ctx.toast.error(ctx.t("messages.uninstalledPartial", { success: successCount, failed: failCount }));
           if (failedPaths.length > 0) {
             console.warn("[confirmUninstall] Failed paths:", failedPaths);
           }
         } else {
-          onError(t("errors.uninstallFailed"));
+          ctx.toast.error(ctx.t("errors.uninstallFailed"));
         }
       }
 
-      const scanResult = await scanLocalSkills();
+      const scanResult = await ctx.scanLocalSkills();
       if (!scanResult) {
         console.warn("[confirmUninstall] scanLocalSkills failed after uninstall");
       }
     } catch (err) {
-      onError(
+      ctx.toast.error(
         getErrorMessage(
           err,
-          uninstallMode.value === "local" ? t("errors.deleteFailed") : t("errors.uninstallFailed")
+          uninstallMode.value === "local" ? ctx.t("errors.deleteFailed") : ctx.t("errors.uninstallFailed")
         )
       );
     } finally {
@@ -124,6 +123,17 @@ export function useUninstallActions(
     uninstallTargetPaths.value = [];
   }
 
+  async function uninstallFromLibrary(path: string): Promise<void> {
+    try {
+      await invoke("uninstall_skill", {
+        request: { targetPath: path, ideLabel: "", ideDirs: [], projectDir: null }
+      });
+      await ctx.scanLocalSkills();
+    } catch (err) {
+      console.error("Failed to uninstall skill:", err);
+    }
+  }
+
   return {
     showUninstallModal,
     uninstallTargetPath,
@@ -136,6 +146,7 @@ export function useUninstallActions(
     openUninstallManyModal,
     openDeleteLocalModal,
     confirmUninstall,
-    cancelUninstall
+    cancelUninstall,
+    uninstallFromLibrary
   };
 }

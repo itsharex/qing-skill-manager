@@ -12,8 +12,7 @@ import type {
   LibraryProjectMapping,
   LibraryIdeInstallation
 } from "./types";
-
-export type TranslateFunction = (key: string, values?: Record<string, string | number>) => string;
+import type { AppContext } from "./useAppContext";
 
 export interface UseLibraryWorkspaceOptions {
   localSkills: { value: LocalSkill[] };
@@ -22,7 +21,7 @@ export interface UseLibraryWorkspaceOptions {
   ideOptions: { value: Array<{ id: string; label: string }> };
   projectSkillSnapshots: { value: Record<string, ProjectSkill[]> };
   currentSkillPackage: { value: SkillPackage | null };
-  t: TranslateFunction;
+  t: AppContext["t"];
 }
 
 export function useLibraryWorkspace(options: UseLibraryWorkspaceOptions) {

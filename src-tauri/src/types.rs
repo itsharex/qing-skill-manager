@@ -176,6 +176,8 @@ pub struct IdeDir {
 #[serde(rename_all = "camelCase")]
 pub struct ImportRequest {
     pub source_path: String,
+    #[serde(default)]
+    pub overwrite: bool,
 }
 
 #[derive(Deserialize, Debug)]

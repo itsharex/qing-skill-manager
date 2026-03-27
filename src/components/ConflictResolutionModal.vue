@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
+import BaseModal from "./BaseModal.vue";
 import type { ProjectSkill, ConflictAnalysis } from "../composables/types";
 
 const { t } = useI18n();
@@ -40,14 +41,7 @@ function handleSubmit() {
 </script>
 
 <template>
-  <Teleport to="body">
-    <div v-if="show" class="modal-overlay" @click.self="handleClose">
-      <div class="modal">
-        <div class="modal-header">
-          <h3>{{ t("conflict.title") }}</h3>
-          <button class="close-btn" @click="handleClose">×</button>
-        </div>
-        
+  <BaseModal :show="show" :title="t('conflict.title')" size="large" @close="handleClose">
          <div v-if="skill" class="modal-content">
             <div class="conflict-info">
               <p class="conflict-desc">{{ t("conflict.description", { name: skill.name }) }}</p>
@@ -190,86 +184,24 @@ function handleSubmit() {
           </div>
         </div>
 
-        <div class="modal-footer">
+        <template #footer>
           <button class="ghost" @click="handleClose">
             {{ t("common.cancel") }}
           </button>
-          <button 
-            class="primary" 
+          <button
+            class="primary"
             :disabled="!canSubmit"
             @click="handleSubmit"
           >
             {{ t("conflict.confirm") }}
           </button>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+        </template>
+  </BaseModal>
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1100;
-  padding: 20px;
-}
-
-.modal {
-  background: var(--color-bg);
-  border-radius: 12px;
-  max-width: 800px;
-  width: 100%;
-  max-height: 90vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: var(--color-muted);
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-}
-
-.close-btn:hover {
-  background: var(--color-hover);
-}
-
 .modal-content {
-  padding: 20px;
-  overflow-y: auto;
-  flex: 1;
+  /* Content-specific styles only */
 }
 
 .conflict-info {
@@ -578,20 +510,4 @@ function handleSubmit() {
   color: var(--color-text);
 }
 
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 20px;
-  border-top: 1px solid var(--color-border);
-}
-
-.modal-footer button {
-  padding: 8px 20px;
-}
-
-.modal-footer button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 </style>

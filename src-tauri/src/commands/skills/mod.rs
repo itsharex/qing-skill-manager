@@ -51,6 +51,7 @@ pub(crate) struct StoredVersionMetadata {
     pub source_url: Option<String>,
     pub parent_version: Option<String>,
     pub deleted: Option<bool>,
+    pub created_at: Option<i64>,
 }
 
 #[derive(Debug, Clone)]
@@ -190,7 +191,7 @@ pub(crate) fn read_skill_metadata(skill_dir: &Path) -> (String, String) {
         }
         if in_frontmatter {
             if let Some(value) = trimmed.strip_prefix("name:") {
-                frontmatter_name = Some(value.trim().to_string());
+                frontmatter_name = Some(strip_yaml_quotes(value.trim()).to_string());
             }
             continue;
         }
@@ -225,11 +226,11 @@ pub(crate) fn parse_skill_metadata(skill_dir: &Path) -> ParsedSkillMetadata {
             continue;
         }
         if let Some(value) = trimmed.strip_prefix("version:") {
-            version = Some(value.trim().to_string());
+            version = Some(strip_yaml_quotes(value.trim()).to_string());
         } else if let Some(value) = trimmed.strip_prefix("author:") {
-            author = Some(value.trim().to_string());
+            author = Some(strip_yaml_quotes(value.trim()).to_string());
         } else if let Some(value) = trimmed.strip_prefix("namespace:") {
-            namespace = Some(value.trim().to_string());
+            namespace = Some(strip_yaml_quotes(value.trim()).to_string());
         }
     }
 
@@ -239,6 +240,18 @@ pub(crate) fn parse_skill_metadata(skill_dir: &Path) -> ParsedSkillMetadata {
         version,
         author,
         namespace,
+    }
+}
+
+/// Strip surrounding YAML quotes (single or double) from a value
+fn strip_yaml_quotes(value: &str) -> &str {
+    let trimmed = value.trim();
+    if (trimmed.starts_with('"') && trimmed.ends_with('"'))
+        || (trimmed.starts_with('\'') && trimmed.ends_with('\''))
+    {
+        &trimmed[1..trimmed.len() - 1]
+    } else {
+        trimmed
     }
 }
 
@@ -252,8 +265,45 @@ pub(crate) fn simple_hash(input: &str) -> String {
 }
 
 pub(crate) fn skill_content_hash(skill_dir: &Path) -> String {
-    let content = fs::read_to_string(skill_dir.join("SKILL.md")).unwrap_or_default();
-    simple_hash(&content)
+    let mut combined = String::new();
+
+    // Collect and sort file paths for deterministic ordering
+    // Exclude manager sidecar files that are not skill content
+    let mut file_paths: Vec<PathBuf> = Vec::new();
+    if let Ok(entries) = fs::read_dir(skill_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name == INSTALL_SIDECAR_FILE || name == VERSION_METADATA_FILE {
+                        continue;
+                    }
+                }
+                file_paths.push(path);
+            }
+        }
+    }
+    file_paths.sort();
+
+    for path in &file_paths {
+        if let Ok(content) = fs::read_to_string(path) {
+            // Include relative filename in hash to detect renames
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                combined.push_str(name);
+                combined.push('\0');
+            }
+            combined.push_str(&content);
+            combined.push('\0');
+        }
+    }
+
+    if combined.is_empty() {
+        // Fallback: try SKILL.md only (backward compat)
+        let content = fs::read_to_string(skill_dir.join("SKILL.md")).unwrap_or_default();
+        simple_hash(&content)
+    } else {
+        simple_hash(&combined)
+    }
 }
 
 pub(crate) fn read_version_sidecar(skill_dir: &Path) -> StoredVersionMetadata {
@@ -292,7 +342,7 @@ pub(crate) fn build_skill_version(skill_dir: &Path, source: SkillVersionSource) 
         version: version_label.clone(),
         display_name: sidecar.display_name.unwrap_or(version_label),
         content_hash,
-        created_at: now_timestamp(),
+        created_at: sidecar.created_at.unwrap_or_else(now_timestamp),
         source,
         source_url: sidecar.source_url,
         parent_version: sidecar.parent_version,
@@ -363,10 +413,8 @@ pub(crate) fn collect_versions_for_skill(base: &Path, skill_id: &str) -> Vec<(Pa
     versions
 }
 
-pub(crate) fn version_summary_for_skill(home: &Path, skill_dir: &Path) -> SkillVersion {
-    let version = build_skill_version(skill_dir, SkillVersionSource::Migration);
-    let _ = write_version_metadata(home, &version);
-    version
+pub(crate) fn version_summary_for_skill(_home: &Path, skill_dir: &Path) -> SkillVersion {
+    build_skill_version(skill_dir, SkillVersionSource::Migration)
 }
 
 pub(crate) fn build_skill_diff(base: &SkillVersion, incoming: &SkillVersion) -> SkillDiff {
@@ -470,6 +518,73 @@ pub(crate) fn package_from_skill_dir(home: &Path, manager_dir: &Path, skill_dir:
         created_at: now_timestamp(),
         updated_at: now_timestamp(),
     }
+}
+
+/// Build a SkillPackage from pre-scanned LocalSkill data, avoiding redundant directory scans.
+/// Produces the same result as `package_from_skill_dir` but groups versions from the
+/// already-collected skills list instead of re-scanning the manager directory.
+pub(crate) fn package_from_scanned_skills(
+    home: &Path,
+    skill_id: &str,
+    scanned_skills: &[LocalSkill],
+) -> Option<SkillPackage> {
+    // Collect all versions for this skill_id from the pre-scanned skills
+    let mut versions: Vec<SkillVersion> = scanned_skills
+        .iter()
+        .filter_map(|skill| {
+            skill.current_version.as_ref().and_then(|v| {
+                if v.skill_id == skill_id {
+                    Some(v.clone())
+                } else {
+                    None
+                }
+            })
+        })
+        .collect();
+
+    // Sort by created_at descending (same as collect_versions_for_skill)
+    versions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    // Need at least one version to build a package
+    let primary_version = versions.first()?.clone();
+
+    let mut state = read_package_state(home, &primary_version.skill_id);
+    if state.variants.is_empty() {
+        state.variants.push(SkillVariant {
+            id: format!("{}-default", primary_version.skill_id),
+            name: "default".to_string(),
+            current_version: state
+                .default_version
+                .clone()
+                .unwrap_or_else(|| primary_version.id.clone()),
+            created_at: now_timestamp(),
+            description: Some("Default tracked version".to_string()),
+        });
+    }
+
+    let strategy = load_default_version_strategy();
+    let (default_version, default_version_source) = resolve_default_version(
+        state.default_version.clone(),
+        &versions,
+        &strategy,
+        &primary_version.id,
+    );
+
+    Some(SkillPackage {
+        id: primary_version.skill_id.clone(),
+        name: primary_version.metadata.name.clone(),
+        namespace: primary_version
+            .metadata
+            .namespace
+            .clone()
+            .unwrap_or_else(|| "default".to_string()),
+        default_version,
+        default_version_source,
+        versions,
+        variants: state.variants,
+        created_at: now_timestamp(),
+        updated_at: now_timestamp(),
+    })
 }
 
 pub(crate) fn collect_skills_from_dir(base: &Path, source: &str, ide: Option<&str>) -> Vec<LocalSkill> {
@@ -659,14 +774,6 @@ pub(crate) fn collect_plugin_skills(base: &Path, ide_label: &str) -> Vec<IdeSkil
     skills
 }
 
-pub(crate) fn remove_path(path: &Path) -> Result<(), String> {
-    if path.is_dir() {
-        fs::remove_dir_all(path).map_err(|err| err.to_string())
-    } else {
-        fs::remove_file(path).map_err(|err| err.to_string())
-    }
-}
-
 pub(crate) fn load_default_version_strategy() -> String {
     let Some(home) = dirs::home_dir() else {
         return "manual".to_string();
@@ -760,6 +867,14 @@ mod tests {
     fn simple_hash_is_stable() {
         assert_eq!(simple_hash("abc"), simple_hash("abc"));
         assert_ne!(simple_hash("abc"), simple_hash("def"));
+    }
+
+    #[test]
+    fn test_strip_yaml_quotes() {
+        assert_eq!(strip_yaml_quotes("\"My Skill\""), "My Skill");
+        assert_eq!(strip_yaml_quotes("'My Skill'"), "My Skill");
+        assert_eq!(strip_yaml_quotes("My Skill"), "My Skill");
+        assert_eq!(strip_yaml_quotes("\"\""), "");
     }
 
     #[test]
@@ -1389,6 +1504,7 @@ mod tests {
             source_url: Some("https://example.com".to_string()),
             parent_version: Some("1.0.0".to_string()),
             deleted: Some(false),
+            created_at: Some(1700000000),
         };
         write_version_sidecar(&temp, &original).expect("write version sidecar");
 

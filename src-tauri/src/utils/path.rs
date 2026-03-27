@@ -73,14 +73,23 @@ pub fn sanitize_dir_name(name: &str) -> String {
 
     #[cfg(target_os = "windows")]
     let mut result = if collapsed.is_empty() {
-        "skill".to_string()
+        // Generate unique name from non-ASCII input using hash
+        if !name.trim().is_empty() {
+            format!("skill-{:08x}", hash_name(name))
+        } else {
+            "skill".to_string()
+        }
     } else {
         collapsed.trim_matches('-').to_string()
     };
 
     #[cfg(not(target_os = "windows"))]
     let result = if collapsed.is_empty() {
-        "skill".to_string()
+        if !name.trim().is_empty() {
+            format!("skill-{:08x}", hash_name(name))
+        } else {
+            "skill".to_string()
+        }
     } else {
         collapsed.trim_matches('-').to_string()
     };
@@ -92,6 +101,16 @@ pub fn sanitize_dir_name(name: &str) -> String {
     }
 
     result
+}
+
+/// Simple hash for generating unique directory names from non-ASCII input
+fn hash_name(name: &str) -> u32 {
+    let mut hash: u32 = 2166136261;
+    for byte in name.as_bytes() {
+        hash ^= *byte as u32;
+        hash = hash.wrapping_mul(16777619);
+    }
+    hash
 }
 
 /// Collapse consecutive hyphens into a single hyphen
@@ -116,6 +135,12 @@ pub fn resolve_canonical(path: &Path) -> Option<PathBuf> {
     fs::canonicalize(path)
         .ok()
         .map(|canon| normalize_path(&canon))
+}
+
+/// Resolve a path to its canonical form, falling back to normalization if the path doesn't exist.
+/// This provides consistent behavior across all path resolution call sites.
+pub fn resolve_or_normalize(path: &Path) -> PathBuf {
+    resolve_canonical(path).unwrap_or_else(|| normalize_path(path))
 }
 
 #[cfg(test)]
@@ -177,7 +202,8 @@ mod tests {
 
     #[test]
     fn test_sanitize_dir_name_only_special_chars() {
-        assert_eq!(sanitize_dir_name("!!!@@@"), "skill");
+        let result = sanitize_dir_name("!!!@@@");
+        assert!(result.starts_with("skill-"), "Expected hash-based name for non-empty input, got: {}", result);
     }
 
     #[test]
@@ -199,7 +225,8 @@ mod tests {
     #[test]
     fn test_sanitize_dir_name_unicode() {
         let result = sanitize_dir_name("技能测试");
-        assert_eq!(result, "skill");
+        assert!(result.starts_with("skill-"), "Expected hash-based name, got: {}", result);
+        assert_ne!(result, sanitize_dir_name("代码审查"), "Different Unicode names should produce different hashes");
     }
 
     #[test]

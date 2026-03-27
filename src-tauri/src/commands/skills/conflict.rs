@@ -6,6 +6,7 @@ use crate::types::{
     ConflictType, ResolveConflictRequest, ResolveConflictResult, ResolutionAction,
     ResolutionSuggestion, SkillDiff, SkillVersionSource,
 };
+use crate::utils::download::copy_dir_recursive;
 use crate::utils::path::sanitize_dir_name;
 use std::path::PathBuf;
 
@@ -62,6 +63,20 @@ pub fn resolve_skill_conflict(
         },
         ConflictResolution::Overwrite => {
             let safe_name = sanitize_dir_name(&skill_name);
+            let home = dirs::home_dir().ok_or("Unable to determine the home directory")?;
+            let target_dir = home.join(".qing-skill-manager/skills").join(&safe_name);
+
+            // Remove existing directory content before overwriting
+            if target_dir.exists() {
+                std::fs::remove_dir_all(&target_dir)
+                    .map_err(|e| format!("Failed to remove existing skill directory: {}", e))?;
+            }
+            std::fs::create_dir_all(&target_dir)
+                .map_err(|e| format!("Failed to create skill directory: {}", e))?;
+
+            copy_dir_recursive(&skill_path, &target_dir)
+                .map_err(|e| format!("Failed to copy skill files (overwrite): {}", e))?;
+
             ResolveConflictResult {
                 success: true,
                 skill_id: Some(safe_name),
@@ -73,6 +88,15 @@ pub fn resolve_skill_conflict(
                 .coexist_name
                 .unwrap_or_else(|| format!("{}-project", skill_name));
             let safe_name = sanitize_dir_name(&coexist_name);
+            let home = dirs::home_dir().ok_or("Unable to determine the home directory")?;
+            let target_dir = home.join(".qing-skill-manager/skills").join(&safe_name);
+
+            std::fs::create_dir_all(&target_dir)
+                .map_err(|e| format!("Failed to create coexist skill directory: {}", e))?;
+
+            copy_dir_recursive(&skill_path, &target_dir)
+                .map_err(|e| format!("Failed to copy skill files (coexist): {}", e))?;
+
             ResolveConflictResult {
                 success: true,
                 skill_id: Some(safe_name),

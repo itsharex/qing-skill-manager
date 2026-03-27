@@ -20,7 +20,9 @@
     "check:frontend": "npm run typecheck",
     "check:rust": "cd src-tauri && cargo check && cargo clippy -- -D warnings",
     "check:rust:fix": "cd src-tauri && cargo clippy --fix --allow-dirty",
-    "verify": "npm run check && npm run test"
+    "verify": "npm run check && npm run test",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -31,9 +33,14 @@
     "vue-i18n": "^10.0.5"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.58.2",
     "@tauri-apps/cli": "^2",
     "@vitejs/plugin-vue": "^5.2.1",
+    "eslint": "^10.1.0",
+    "eslint-plugin-vue": "^10.8.0",
     "typescript": "~5.6.2",
+    "typescript-eslint": "^8.57.2",
     "vite": "^6.0.3",
     "vue-tsc": "^2.1.10"
   }

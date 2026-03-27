@@ -5,18 +5,11 @@ import type { LocalSkill, InstallResult, LinkTarget, IdeOption, ProjectConfig } 
 import { isSafeRelativePath, isSafeAbsolutePath, getErrorMessage } from "./utils";
 import { buildProjectCloneTargetPath } from "./constants";
 import { loadLastInstallTargets, saveLastInstallTargets } from "./useIdeConfig";
-
-export type ToastFunction = (message: string) => void;
-export type ErrorToastFunction = (message: string) => void;
-export type ScanLocalSkillsFunction = () => Promise<boolean>;
-export type TranslateFunction = (key: string, values?: Record<string, string | number>) => string;
+import type { AppContext } from "./useAppContext";
 
 export function useInstallActions(
   ideOptions: { value: IdeOption[] },
-  onSuccess: ToastFunction,
-  onError: ErrorToastFunction,
-  scanLocalSkills: ScanLocalSkillsFunction,
-  t: TranslateFunction
+  ctx: AppContext
 ) {
   const showInstallModal = ref(false);
   const installTargetSkills = ref<LocalSkill[]>([]);
@@ -59,7 +52,7 @@ export function useInstallActions(
   ): Promise<InstallResult> {
     const installTargets = await buildInstallTargets(ideLabel);
     if (installTargets.length === 0) {
-      throw new Error(t("errors.selectValidIde"));
+      throw new Error(ctx.t("errors.selectValidIde"));
     }
 
     const result = (await invoke("clone_local_skill", {
@@ -71,10 +64,10 @@ export function useInstallActions(
     })) as InstallResult;
 
     if (!suppressToast) {
-      onSuccess(t("messages.handled", { installed: result.installed.length, skipped: result.skipped.length }));
+      ctx.toast.success(ctx.t("messages.handled", { installed: result.installed.length, skipped: result.skipped.length }));
     }
     if (!skipScan) {
-      await scanLocalSkills();
+      await ctx.scanLocalSkills();
     }
     return result;
   }
@@ -88,7 +81,7 @@ export function useInstallActions(
   ): Promise<InstallResult> {
     const installTargets = await buildProjectInstallTargets(projectPath, ideLabel);
     if (installTargets.length === 0) {
-      throw new Error(t("errors.selectValidIde"));
+      throw new Error(ctx.t("errors.selectValidIde"));
     }
 
     const result = (await invoke("clone_local_skill", {
@@ -100,10 +93,10 @@ export function useInstallActions(
     })) as InstallResult;
 
     if (!suppressToast) {
-      onSuccess(t("messages.handled", { installed: result.installed.length, skipped: result.skipped.length }));
+      ctx.toast.success(ctx.t("messages.handled", { installed: result.installed.length, skipped: result.skipped.length }));
     }
     if (!skipScan) {
-      await scanLocalSkills();
+      await ctx.scanLocalSkills();
     }
     return result;
   }
@@ -133,43 +126,54 @@ export function useInstallActions(
   ): Promise<void> {
     if (installTarget === "project") {
       if (!projects || projects.length === 0) {
-        onError("No projects available");
+        ctx.toast.error("No projects available");
         showInstallModal.value = false;
         installTargetSkills.value = [];
         return;
       }
 
       if (installTargetSkills.value.length === 0 || targetIds.length === 0) {
-        onError(t("errors.selectAtLeastOne"));
+        ctx.toast.error(ctx.t("errors.selectAtLeastOne"));
         return;
       }
 
       if (installingId.value) return;
       installingId.value = installTargetSkills.value.length === 1 ? installTargetSkills.value[0].id : "__batch__";
       busy.value = true;
-      busyText.value = t("messages.installing");
+      busyText.value = ctx.t("messages.installing");
 
       try {
         let totalInstalled = 0;
         let totalSkipped = 0;
         const selectedProjects = projects.filter((project) => targetIds.includes(project.id));
 
+        let failCount = 0;
         for (const skill of installTargetSkills.value) {
           for (const project of selectedProjects) {
             for (const ideLabel of project.ideTargets) {
-              const result = await cloneSkillToProjectInternal(skill, project.path, ideLabel, true, true);
-              totalInstalled += result.installed.length;
-              totalSkipped += result.skipped.length;
+              try {
+                const result = await cloneSkillToProjectInternal(skill, project.path, ideLabel, true, true);
+                totalInstalled += result.installed.length;
+                totalSkipped += result.skipped.length;
+              } catch {
+                failCount++;
+              }
             }
           }
         }
 
-        onSuccess(t("messages.handled", { installed: totalInstalled, skipped: totalSkipped }));
-        await scanLocalSkills();
+        if (failCount > 0 && totalInstalled > 0) {
+          ctx.toast.error(ctx.t("messages.installedPartial", { installed: totalInstalled, failed: failCount }));
+        } else if (failCount > 0) {
+          ctx.toast.error(ctx.t("errors.installFailed"));
+        } else {
+          ctx.toast.success(ctx.t("messages.handled", { installed: totalInstalled, skipped: totalSkipped }));
+        }
+        await ctx.scanLocalSkills();
         showInstallModal.value = false;
         installTargetSkills.value = [];
       } catch (err) {
-        onError(getErrorMessage(err, t("errors.installFailed")));
+        ctx.toast.error(getErrorMessage(err, ctx.t("errors.installFailed")));
       } finally {
         installingId.value = null;
         busy.value = false;
@@ -179,32 +183,43 @@ export function useInstallActions(
     }
 
     if (installTargetSkills.value.length === 0 || targetIds.length === 0) {
-      onError(t("errors.selectAtLeastOne"));
+      ctx.toast.error(ctx.t("errors.selectAtLeastOne"));
       return;
     }
 
     if (installingId.value) return;
     installingId.value = installTargetSkills.value.length === 1 ? installTargetSkills.value[0].id : "__batch__";
     busy.value = true;
-    busyText.value = t("messages.installing");
+    busyText.value = ctx.t("messages.installing");
 
     try {
       let totalInstalled = 0;
       let totalSkipped = 0;
+      let failCount = 0;
       for (const skill of installTargetSkills.value) {
         for (const label of targetIds) {
-          const result = await cloneSkillToIdeInternal(skill, label, true, true);
-          totalInstalled += result.installed.length;
-          totalSkipped += result.skipped.length;
+          try {
+            const result = await cloneSkillToIdeInternal(skill, label, true, true);
+            totalInstalled += result.installed.length;
+            totalSkipped += result.skipped.length;
+          } catch {
+            failCount++;
+          }
         }
       }
 
-      onSuccess(t("messages.handled", { installed: totalInstalled, skipped: totalSkipped }));
-      await scanLocalSkills();
+      if (failCount > 0 && totalInstalled > 0) {
+        ctx.toast.error(ctx.t("messages.installedPartial", { installed: totalInstalled, failed: failCount }));
+      } else if (failCount > 0) {
+        ctx.toast.error(ctx.t("errors.installFailed"));
+      } else {
+        ctx.toast.success(ctx.t("messages.handled", { installed: totalInstalled, skipped: totalSkipped }));
+      }
+      await ctx.scanLocalSkills();
       showInstallModal.value = false;
       installTargetSkills.value = [];
     } catch (err) {
-      onError(getErrorMessage(err, t("errors.installFailed")));
+      ctx.toast.error(getErrorMessage(err, ctx.t("errors.installFailed")));
     } finally {
       installingId.value = null;
       busy.value = false;

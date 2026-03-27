@@ -1,25 +1,18 @@
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import type { IdeSkill } from "./types";
+import type { IdeSkill, LocalSkill } from "./types";
 import { getErrorMessage } from "./utils";
-
-export type ToastFunction = (message: string) => void;
-export type ErrorToastFunction = (message: string) => void;
-export type ScanLocalSkillsFunction = () => Promise<boolean>;
-export type TranslateFunction = (key: string, values?: Record<string, string | number>) => string;
+import type { AppContext } from "./useAppContext";
 
 export function useIdeAdoption(
-  onSuccess: ToastFunction,
-  onError: ErrorToastFunction,
-  scanLocalSkills: ScanLocalSkillsFunction,
-  t: TranslateFunction
+  ctx: AppContext
 ) {
   const busy = ref(false);
   const busyText = ref("");
 
   async function adoptIdeSkill(skill: IdeSkill): Promise<void> {
     busy.value = true;
-    busyText.value = t("messages.adopting");
+    busyText.value = ctx.t("messages.adopting");
     try {
       const message = (await invoke("adopt_ide_skill", {
         request: {
@@ -27,10 +20,10 @@ export function useIdeAdoption(
           ideLabel: skill.ide
         }
       })) as string;
-      onSuccess(message);
-      await scanLocalSkills();
+      ctx.toast.success(message);
+      await ctx.scanLocalSkills();
     } catch (err) {
-      onError(getErrorMessage(err, t("errors.adoptFailed")));
+      ctx.toast.error(getErrorMessage(err, ctx.t("errors.adoptFailed")));
     } finally {
       busy.value = false;
       busyText.value = "";
@@ -40,7 +33,7 @@ export function useIdeAdoption(
   async function adoptManyIdeSkills(skills: IdeSkill[]): Promise<void> {
     if (skills.length === 0) return;
     busy.value = true;
-    busyText.value = t("messages.adopting");
+    busyText.value = ctx.t("messages.adopting");
     let successCount = 0;
     let failCount = 0;
     const failedSkills: string[] = [];
@@ -62,20 +55,59 @@ export function useIdeAdoption(
       }
 
       if (successCount > 0 && failCount === 0) {
-        onSuccess(t("messages.adoptedCount", { count: successCount }));
+        ctx.toast.success(ctx.t("messages.adoptedCount", { count: successCount }));
       } else if (successCount > 0 && failCount > 0) {
-        onError(t("messages.adoptedPartial", { success: successCount, failed: failCount }));
+        ctx.toast.error(ctx.t("messages.adoptedPartial", { success: successCount, failed: failCount }));
         if (failedSkills.length > 0) {
           console.warn("[adoptManyIdeSkills] Failed to adopt:", failedSkills);
         }
       } else {
-        onError(t("errors.adoptFailed"));
+        ctx.toast.error(ctx.t("errors.adoptFailed"));
       }
 
-      const scanResult = await scanLocalSkills();
+      const scanResult = await ctx.scanLocalSkills();
       if (!scanResult) {
         console.warn("[adoptManyIdeSkills] scanLocalSkills failed after adopt");
       }
+    } finally {
+      busy.value = false;
+      busyText.value = "";
+    }
+  }
+
+  async function adoptToRepo(
+    path: string,
+    localSkills: { value: LocalSkill[] },
+    loadSkillPackage: (skillId: string) => Promise<unknown>
+  ): Promise<void> {
+    const dirName = path.split("/").pop() || "";
+    try {
+      await invoke("import_local_skill", { request: { sourcePath: path } });
+      await ctx.scanLocalSkills();
+      // Find the newly imported skill and load its package
+      const newSkill = localSkills.value.find((s) => s.name === dirName || s.path.endsWith(`/${dirName}`));
+      if (newSkill?.currentVersion) {
+        void loadSkillPackage(newSkill.currentVersion.skillId || newSkill.id);
+      }
+    } catch (err) {
+      console.error("Failed to adopt skill:", err);
+    }
+  }
+
+  async function adoptManyToRepo(targets: Array<{ path: string; ideLabel: string }>): Promise<void> {
+    busy.value = true;
+    busyText.value = ctx.t("messages.adopting");
+    try {
+      for (const target of targets) {
+        try {
+          await invoke("adopt_ide_skill", {
+            request: { targetPath: target.path, ideLabel: target.ideLabel || "IDE" }
+          });
+        } catch (err) {
+          console.warn("Failed to adopt skill:", target.path, err);
+        }
+      }
+      await ctx.scanLocalSkills();
     } finally {
       busy.value = false;
       busyText.value = "";
@@ -86,6 +118,8 @@ export function useIdeAdoption(
     busy,
     busyText,
     adoptIdeSkill,
-    adoptManyIdeSkills
+    adoptManyIdeSkills,
+    adoptToRepo,
+    adoptManyToRepo
   };
 }

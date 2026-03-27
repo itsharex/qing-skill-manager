@@ -157,6 +157,14 @@ export type ProjectSkillScanResult = {
 };
 
 /**
+ * Request to import a local skill into the manager
+ */
+export type ImportRequest = {
+  sourcePath: string;
+  overwrite?: boolean;
+};
+
+/**
  * Conflict resolution action
  */
 export type ConflictResolution = "keep" | "overwrite" | "coexist";

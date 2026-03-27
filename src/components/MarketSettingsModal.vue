@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import BaseModal from "./BaseModal.vue";
 
 const { t } = useI18n();
 
@@ -54,10 +55,7 @@ function getStatusLabel(status: string): string {
 </script>
 
 <template>
-  <div v-if="show" class="modal-backdrop" @click.self="$emit('close')">
-    <div class="modal">
-      <div class="modal-title">{{ t("marketSettings.title") }}</div>
-      
+  <BaseModal :show="show" :title="t('marketSettings.title')" size="medium" @close="$emit('close')">
       <div class="market-list">
         <div v-for="market in statuses" :key="market.id" class="market-item">
           <div class="market-header">
@@ -107,12 +105,11 @@ function getStatusLabel(status: string): string {
         </div>
       </div>
 
-      <div class="modal-actions">
+      <template #footer>
         <button class="ghost" @click="$emit('close')">{{ t("marketSettings.cancel") }}</button>
         <button class="primary" @click="save">{{ t("marketSettings.save") }}</button>
-      </div>
-    </div>
-  </div>
+      </template>
+  </BaseModal>
 </template>
 
 <style scoped>

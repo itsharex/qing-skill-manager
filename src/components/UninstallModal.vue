@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
+import BaseModal from "./BaseModal.vue";
 
 defineProps<{
   visible: boolean;
@@ -16,21 +17,22 @@ const { t } = useI18n();
 </script>
 
 <template>
-  <div v-if="visible" class="modal-backdrop">
-    <div class="modal">
-      <div class="modal-title">
-        {{ mode === "local" ? t("uninstallModal.deleteTitle") : t("uninstallModal.title") }}
-      </div>
-      <div class="hint">
-        {{ mode === "local" ? t("uninstallModal.deleteHint") : t("uninstallModal.hint") }}
-      </div>
-      <div class="card-link">{{ targetName }}</div>
-      <div class="modal-actions">
-        <button class="ghost" @click="$emit('cancel')">{{ t("uninstallModal.cancel") }}</button>
-        <button class="primary" @click="$emit('confirm')">
-          {{ mode === "local" ? t("uninstallModal.deleteConfirm") : t("uninstallModal.confirm") }}
-        </button>
-      </div>
+  <BaseModal
+    :show="visible"
+    :title="mode === 'local' ? t('uninstallModal.deleteTitle') : t('uninstallModal.title')"
+    size="small"
+    @close="$emit('cancel')"
+  >
+    <div class="hint">
+      {{ mode === "local" ? t("uninstallModal.deleteHint") : t("uninstallModal.hint") }}
     </div>
-  </div>
+    <div class="card-link">{{ targetName }}</div>
+
+    <template #footer>
+      <button class="ghost" @click="$emit('cancel')">{{ t("uninstallModal.cancel") }}</button>
+      <button class="primary" @click="$emit('confirm')">
+        {{ mode === "local" ? t("uninstallModal.deleteConfirm") : t("uninstallModal.confirm") }}
+      </button>
+    </template>
+  </BaseModal>
 </template>

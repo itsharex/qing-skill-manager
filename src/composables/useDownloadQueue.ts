@@ -2,15 +2,10 @@ import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir, join } from "@tauri-apps/api/path";
 import type { RemoteSkill, DownloadTask } from "./types";
-
-export type ToastFunction = (message: string) => void;
-export type ScanLocalSkillsFunction = () => Promise<boolean>;
-export type TranslateFunction = (key: string, values?: Record<string, string | number>) => string;
+import type { AppContext } from "./useAppContext";
 
 export function useDownloadQueue(
-  onSuccess: ToastFunction,
-  t: TranslateFunction,
-  scanLocalSkills: ScanLocalSkillsFunction
+  ctx: AppContext
 ) {
   const downloadQueue = ref<DownloadTask[]>([]);
   const recentTaskStatus = ref<Record<string, "download" | "update">>({});
@@ -65,10 +60,10 @@ export function useDownloadQueue(
           [task.id]: task.action
         };
 
-        onSuccess(
+        ctx.toast.success(
           task.action === "update"
-            ? t("messages.updated", { path: task.name })
-            : t("messages.downloaded", { path: task.name })
+            ? ctx.t("messages.updated", { path: task.name })
+            : ctx.t("messages.downloaded", { path: task.name })
         );
 
         const timerId = window.setTimeout(() => {
@@ -76,7 +71,7 @@ export function useDownloadQueue(
           const nextStatus = { ...recentTaskStatus.value };
           delete nextStatus[task.id];
           recentTaskStatus.value = nextStatus;
-          void scanLocalSkills();
+          void ctx.scanLocalSkills();
           const index = timers.indexOf(timerId);
           if (index > -1) timers.splice(index, 1);
         }, 2500);

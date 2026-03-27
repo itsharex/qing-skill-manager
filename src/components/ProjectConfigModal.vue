@@ -2,6 +2,7 @@
 import { ref, computed } from "vue";
 import type { ProjectConfig, IdeOption } from "../composables/types";
 import { useI18n } from "vue-i18n";
+import BaseModal from "./BaseModal.vue";
 
 const { t } = useI18n();
 
@@ -45,15 +46,7 @@ if (props.project) {
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="modal-fade">
-      <div v-if="visible" class="modal-overlay" @click.self="handleClose">
-        <div class="modal">
-          <div class="modal-header">
-            <h2 class="modal-title">{{ t("projects.configureTitle") }}</h2>
-            <button class="modal-close" @click="handleClose">×</button>
-          </div>
-
+  <BaseModal :show="visible" :title="t('projects.configureTitle')" size="medium" @close="handleClose">
           <div v-if="project" class="modal-body">
             <div class="project-info">
               <div class="info-label">{{ t("projects.projectName") }}</div>
@@ -89,76 +82,16 @@ if (props.project) {
             </div>
           </div>
 
-          <div class="modal-footer">
+          <template #footer>
             <button class="ghost" @click="handleClose">{{ t("projects.cancel") }}</button>
             <button class="primary" @click="handleSave">{{ t("projects.save") }}</button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+          </template>
+  </BaseModal>
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--color-overlay-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
-.modal {
-  background: var(--color-panel-bg);
-  border-radius: 12px;
-  max-width: 600px;
-  width: 100%;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--color-panel-border);
-}
-
-.modal-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin: 0;
-}
-
-.modal-close {
-  background: transparent;
-  border: none;
-  font-size: 28px;
-  color: var(--color-muted);
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: background 0.2s ease;
-}
-
-.modal-close:hover {
-  background: var(--color-tabs-bg);
-  color: var(--color-text);
-}
-
 .modal-body {
-  padding: 24px;
+  /* Content-specific styles only */
 }
 
 .project-info {
@@ -227,21 +160,4 @@ if (props.project) {
   pointer-events: none;
 }
 
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 20px 24px;
-  border-top: 1px solid var(--color-panel-border);
-}
-
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-  opacity: 0;
-}
 </style>

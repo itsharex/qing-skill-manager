@@ -263,7 +263,8 @@ pub async fn search_marketplaces(
                     let skillsllm_page = (offset / limit).saturating_add(1);
                     let mut skillsllm_url = String::from("https://skillsllm.com/api/skills?");
                     if !query_param_clone.is_empty() {
-                        skillsllm_url.push_str(&format!("q={}&", urlencoding::encode(trimmed)));
+                        skillsllm_url.push_str(&query_param_clone);
+                        skillsllm_url.push('&');
                     }
                     skillsllm_url.push_str(&format!("page={}&limit={}", skillsllm_page, limit));
 
@@ -308,8 +309,8 @@ pub async fn search_marketplaces(
                 let mut status = MarketStatus {
                     id: skillsmp_market_id.to_string(),
                     name: skillsmp_market_label.to_string(),
-                    status: if skillsmp_enabled { MarketStatusType::NeedsKey } else { MarketStatusType::NeedsKey },
-                    error: None,
+                    status: if skillsmp_enabled { MarketStatusType::NeedsKey } else { MarketStatusType::Error },
+                    error: if skillsmp_enabled { None } else { Some("Market is disabled".to_string()) },
                 };
 
                 if skillsmp_enabled {

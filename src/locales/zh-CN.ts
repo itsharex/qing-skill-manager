@@ -29,7 +29,8 @@ export default {
     title: "设置",
     about: {
       title: "关于",
-      version: "版本"
+      version: "版本",
+      sponsor: "赞助商"
     },
     appearance: {
       title: "外观",
@@ -155,6 +156,7 @@ export default {
     uninstalling: "正在卸载...",
     uninstalledCount: "已卸载 {count} 个技能",
     uninstalledPartial: "成功卸载 {success} 个，失败 {failed} 个",
+    installedPartial: "安装了 {installed} 个，{failed} 个失败",
     adoptedCount: "已纳管 {count} 个技能",
     adoptedPartial: "成功纳管 {success} 个，失败 {failed} 个",
     deleting: "正在删除...",

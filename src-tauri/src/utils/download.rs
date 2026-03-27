@@ -43,6 +43,11 @@ pub fn download_skill_to_dir(
         return Err("Install directory is outside the allowed scope".to_string());
     }
 
+    // Validate URL scheme - only allow HTTPS
+    if !source_url.starts_with("https://") {
+        return Err("Only HTTPS URLs are allowed for downloads".to_string());
+    }
+
     fs::create_dir_all(install_base_dir).map_err(|err| err.to_string())?;
 
     let safe_name = sanitize_dir_name(skill_name);
@@ -126,6 +131,15 @@ impl<'a> Drop for TempDirGuard<'a> {
 pub fn extract_zip(buf: &[u8], extract_dir: &Path) -> Result<(), String> {
     let cursor = Cursor::new(buf);
     let mut zip = ZipArchive::new(cursor).map_err(|err| err.to_string())?;
+
+    const MAX_ZIP_ENTRIES: usize = 1000;
+    let entry_count = zip.len();
+    if entry_count > MAX_ZIP_ENTRIES {
+        return Err(format!(
+            "ZIP contains too many entries ({}, max {})",
+            entry_count, MAX_ZIP_ENTRIES
+        ));
+    }
 
     let canonical_extract = extract_dir
         .canonicalize()

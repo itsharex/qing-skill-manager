@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import { computed, onMounted, toRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSkillsManager } from "./composables/useSkillsManager";
 import { usePreferences } from "./composables/usePreferences";
@@ -27,104 +26,9 @@ const { t } = useI18n();
 
 const { theme, locale, toggleTheme, toggleLocale } = usePreferences();
 
-const {
-  activeTab,
-  query,
-  results,
-  loading,
-  installingId,
-  updatingId,
-  localSkills,
-  localLoading,
-  ideOptions,
-  selectedIdeFilter,
-  customIdeName,
-  customIdeDir,
-  customIdeOptions,
-  filteredIdeSkills,
-  showInstallModal,
-  showUninstallModal,
-  uninstallTargetName,
-  uninstallMode,
-  busy,
-  busyText,
-  hasMore,
-  localSkillNameSet,
-  searchMarketplace,
-  downloadSkill,
-  updateSkill,
-  scanLocalSkills,
-  openInstallModal,
-  addCustomIde,
-  removeCustomIde,
-  openUninstallModal,
-  openUninstallManyModal,
-  openDeleteLocalModal,
-  confirmInstallToIde,
-  closeInstallModal,
-  confirmUninstall,
-  cancelUninstall,
-  importLocalSkill,
-  openSkillDirectory,
-  adoptIdeSkill,
-  adoptManyIdeSkills,
-  marketConfigs,
-  marketStatuses,
-  enabledMarkets,
-  saveMarketConfigs,
-  downloadQueue,
-  recentTaskStatus,
-  retryDownload,
-  removeFromQueue,
-  projectSkillScanResult,
-  showConflictModal,
-  currentConflictSkill,
-  scanProjectSkills,
-  resolveConflict,
-  openConflictModal,
-  closeConflictModal,
-  currentSkillPackage,
-  showVersionManagerModal,
-  versionLoading,
-  currentConflictAnalysis,
-  showVersionDiffModal,
-  currentVersionDiff,
-  analyzeConflict,
-  loadSkillPackage,
-  compareVersions,
-  createVersion,
-  renameVersion,
-  deleteVersion,
-  setDefaultVersion,
-  createVariant,
-  updateVariant,
-  deleteVariant,
-  openVersionManagerModal,
-  closeVersionManagerModal,
-  openVersionDiffModal,
-  closeVersionDiffModal,
-  librarySkills,
-  projects,
-  selectedProjectId,
-  loadProjects,
-  addProject,
-  removeProject,
-  updateProjectIdeTargets,
-  updateDetectedIdeDirs,
-  projectSkillSnapshots,
-  refreshProjectSkillSnapshots,
-  restartProjectSnapshotRefreshLoop,
-  comparingFromVersion,
-  comparingToVersion,
-  currentDiff,
-  currentManagedSkillPath,
-  selectedCreateVersionSourcePath,
-  versionImportProjectId,
-  versionImportProjectSkills,
-  versionImportProjectSkillsLoading,
-  setComparisonVersions,
-  setVersionImportProject
-} = useSkillsManager();
+const sm = useSkillsManager();
+const { activeTab, busy, busyText } = sm;
+const { market, library, ide, install, uninstall, version, project } = sm;
 
 const {
   localBusy,
@@ -153,56 +57,56 @@ const {
   handleCloneSkillsToProject,
   rescanAllProjectIdes
 } = useProjectHandlers({
-  projects,
-  selectedProjectId,
-  localSkills,
-  addProject,
-  removeProject,
-  updateProjectIdeTargets,
-  updateDetectedIdeDirs,
-  scanProjectSkills,
-  scanLocalSkills,
-  refreshProjectSkillSnapshots,
-  analyzeConflict,
-  openConflictModal,
-  closeConflictModal,
-  resolveConflict
+  projects: toRef(project, "projects"),
+  selectedProjectId: toRef(project, "selectedProjectId"),
+  localSkills: toRef(library, "localSkills"),
+  addProject: project.addProject,
+  removeProject: project.removeProject,
+  updateProjectIdeTargets: project.updateProjectIdeTargets,
+  updateDetectedIdeDirs: project.updateDetectedIdeDirs,
+  scanProjectSkills: project.scanProjectSkills,
+  scanLocalSkills: library.scanLocalSkills,
+  refreshProjectSkillSnapshots: project.refreshProjectSkillSnapshots,
+  analyzeConflict: version.analyzeConflict,
+  openConflictModal: project.openConflictModal,
+  closeConflictModal: project.closeConflictModal,
+  resolveConflict: project.resolveConflict
 });
 
 const displayBusy = computed(() => localBusy.value || busy.value);
 const displayBusyText = computed(() => localBusyText.value || busyText.value);
 
 onMounted(() => {
-  loadProjects();
-  void refreshProjectSkillSnapshots();
-  restartProjectSnapshotRefreshLoop();
+  project.loadProjects();
+  void project.refreshProjectSkillSnapshots();
+  project.restartProjectSnapshotRefreshLoop();
   void rescanAllProjectIdes();
   // Periodic rescan every 5 minutes to detect new IDE usage
   setInterval(() => void rescanAllProjectIdes(), 5 * 60 * 1000);
 });
 
-watch(projects, () => {
-  void refreshProjectSkillSnapshots();
-  restartProjectSnapshotRefreshLoop();
+watch(() => project.projects, () => {
+  void project.refreshProjectSkillSnapshots();
+  project.restartProjectSnapshotRefreshLoop();
 }, { deep: true });
 
 watch(activeTab, (tab) => {
   if (tab === "projects") {
-    void refreshProjectSkillSnapshots();
+    void project.refreshProjectSkillSnapshots();
   }
 });
 
 async function handleConflictResolution(resolution: "keep" | "overwrite" | "coexist", coexistName?: string) {
-  await handleConflictResolutionRaw(currentConflictSkill.value, resolution, coexistName);
+  await handleConflictResolutionRaw(project.currentConflictSkill, resolution, coexistName);
 }
 
-async function handleRegisterVersion(sourcePath: string, displayName: string, version: string) {
-  if (!currentSkillPackage.value) return;
-  const pkg = currentSkillPackage.value;
+async function handleRegisterVersion(sourcePath: string, displayName: string, versionLabel: string) {
+  if (!version.currentSkillPackage) return;
+  const pkg = version.currentSkillPackage;
   // Add timestamp suffix to version to avoid ID collision with soft-deleted versions
-  const uniqueLabel = `${version}-${Date.now().toString(36).slice(-4)}`;
+  const uniqueLabel = `${versionLabel}-${Date.now().toString(36).slice(-4)}`;
   try {
-    await createVersion({
+    await version.createVersion({
       skillId: pkg.id,
       sourcePath,
       displayName,
@@ -215,89 +119,51 @@ async function handleRegisterVersion(sourcePath: string, displayName: string, ve
 }
 
 async function handleAdoptToRepo(path: string) {
-  const dirName = path.split("/").pop() || "";
-  try {
-    await invoke("import_local_skill", { request: { sourcePath: path } });
-    await scanLocalSkills();
-    // Find the newly imported skill and load its package
-    const newSkill = localSkills.value.find((s) => s.name === dirName || s.path.endsWith(`/${dirName}`));
-    if (newSkill?.currentVersion) {
-      void loadSkillPackage(newSkill.currentVersion.skillId || newSkill.id);
-    }
-  } catch (err) {
-    console.error("Failed to adopt skill:", err);
-  }
+  await ide.adoptToRepo(path, toRef(library, "localSkills"), version.loadSkillPackage);
 }
 
 async function handleAdoptManyToRepo(targets: Array<{ path: string; ideLabel: string }>) {
-  localBusy.value = true;
-  localBusyText.value = t("messages.adopting");
-  let successCount = 0;
-  let failCount = 0;
-  try {
-    for (const target of targets) {
-      try {
-        await invoke("adopt_ide_skill", {
-          request: { targetPath: target.path, ideLabel: target.ideLabel || "IDE" }
-        });
-        successCount++;
-      } catch (err) {
-        failCount++;
-        console.warn("Failed to adopt skill:", target.path, err);
-      }
-    }
-    await scanLocalSkills();
-  } finally {
-    localBusy.value = false;
-    localBusyText.value = "";
-  }
+  await ide.adoptManyToRepo(targets);
 }
 
 async function handleLibraryUninstallSkill(path: string) {
-  try {
-    await invoke("uninstall_skill", {
-      request: { targetPath: path, ideLabel: "", ideDirs: [], projectDir: null }
-    });
-    await scanLocalSkills();
-  } catch (err) {
-    console.error("Failed to uninstall skill:", err);
-  }
+  await uninstall.uninstallFromLibrary(path);
 }
 
 function handleLibrarySelectSkill(skill: LocalSkill) {
   if (!skill.currentVersion) {
     // Unmanaged skill — clear previous package
-    currentSkillPackage.value = null;
+    version.currentSkillPackage = null;
     return;
   }
   const skillId = skill.currentVersion.skillId || skill.id;
-  void loadSkillPackage(skillId);
+  void version.loadSkillPackage(skillId);
 }
 
 async function handleCompareVersions(fromVersionId: string, toVersionId: string) {
-  if (!currentSkillPackage.value) return;
+  if (!version.currentSkillPackage) return;
 
-  const fromVersion = currentSkillPackage.value.versions.find((item) => item.id === fromVersionId) || null;
-  const toVersion = currentSkillPackage.value.versions.find((item) => item.id === toVersionId) || null;
-  const diff = await compareVersions(currentSkillPackage.value.id, fromVersionId, toVersionId);
-  setComparisonVersions(fromVersion, toVersion, diff);
-  openVersionDiffModal();
+  const fromVersion = version.currentSkillPackage.versions.find((item) => item.id === fromVersionId) || null;
+  const toVersion = version.currentSkillPackage.versions.find((item) => item.id === toVersionId) || null;
+  const diff = await version.compareVersions(version.currentSkillPackage.id, fromVersionId, toVersionId);
+  version.setComparisonVersions(fromVersion, toVersion, diff);
+  version.openVersionDiffModal();
 }
 
 function handleOpenCreateVersionFromLibrary() {
-  if (!currentSkillPackage.value) {
+  if (!version.currentSkillPackage) {
     return;
   }
 
-  selectedCreateVersionSourcePath.value = currentManagedSkillPath.value || "";
-  openVersionManagerModal(currentSkillPackage.value.id);
+  version.selectedCreateVersionSourcePath = version.currentManagedSkillPath || "";
+  version.openVersionManagerModal(version.currentSkillPackage.id);
 }
 
-async function handleCreateVersion(version: string, displayName: string, sourcePath: string, parentVersion?: string) {
-  if (!currentSkillPackage.value) return;
-  await createVersion({
-    skillId: currentSkillPackage.value.id,
-    version,
+async function handleCreateVersion(versionLabel: string, displayName: string, sourcePath: string, parentVersion?: string) {
+  if (!version.currentSkillPackage) return;
+  await version.createVersion({
+    skillId: version.currentSkillPackage.id,
+    version: versionLabel,
     displayName,
     sourcePath,
     source: "import",
@@ -307,39 +173,11 @@ async function handleCreateVersion(version: string, displayName: string, sourceP
 }
 
 async function handlePickSourcePath() {
-  const { open } = await import("@tauri-apps/plugin-dialog");
-  const selected = await open({
-    directory: true,
-    multiple: false,
-    title: t("version.pickSourcePathTitle")
-  });
-
-  if (!selected || Array.isArray(selected)) {
-    return;
-  }
-
-  selectedCreateVersionSourcePath.value = selected;
+  await version.pickSourcePath();
 }
 
 async function handlePickVersionImportProject(projectId: string) {
-  const project = projects.value.find((item) => item.id === projectId);
-  setVersionImportProject(projectId, [], false);
-
-  if (!project) {
-    return;
-  }
-
-  versionImportProjectSkillsLoading.value = true;
-  try {
-    const result = await scanProjectSkills(project.path, { silent: true });
-    setVersionImportProject(projectId, result?.skills ?? [], false);
-    projectSkillSnapshots.value = {
-      ...projectSkillSnapshots.value,
-      [project.id]: result?.skills ?? []
-    };
-  } finally {
-    versionImportProjectSkillsLoading.value = false;
-  }
+  await version.pickVersionImportProject(projectId, toRef(project, "projects"), project.scanProjectSkills, toRef(project, "projectSkillSnapshots"));
 }
 
 
@@ -400,24 +238,24 @@ async function handlePickVersionImportProject(projectId: string) {
     <main class="content">
       <template v-if="activeTab === 'local'">
         <LibraryWorkspace
-          :local-skills="localSkills"
-          :local-loading="localLoading"
-          :installing-id="installingId"
-          :download-queue="downloadQueue"
-          :ide-options="ideOptions"
-          :skill-package="currentSkillPackage"
-          :version-loading="versionLoading"
-          :projects="projects"
-          :library-skills="librarySkills"
-          @install="openInstallModal"
-          @install-many="openInstallModal"
-          @delete-local="openDeleteLocalModal"
+          :local-skills="library.localSkills"
+          :local-loading="library.localLoading"
+          :installing-id="install.installingId"
+          :download-queue="market.downloadQueue"
+          :ide-options="ide.ideOptions"
+          :skill-package="version.currentSkillPackage"
+          :version-loading="version.versionLoading"
+          :projects="project.projects"
+          :library-skills="library.librarySkills"
+          @install="install.openInstallModal"
+          @install-many="install.openInstallModal"
+          @delete-local="uninstall.openDeleteLocalModal"
           @clone-to-project="handleLibraryCloneToProject"
-          @open-dir="openSkillDirectory"
-          @refresh="scanLocalSkills"
-          @import="importLocalSkill"
-          @retry-download="retryDownload"
-          @remove-from-queue="removeFromQueue"
+          @open-dir="library.openSkillDirectory"
+          @refresh="library.scanLocalSkills"
+          @import="library.importLocalSkill"
+          @retry-download="market.retryDownload"
+          @remove-from-queue="market.removeFromQueue"
           @select-skill="handleLibrarySelectSkill"
           @adopt-to-repo="handleAdoptToRepo"
           @adopt-many-to-repo="handleAdoptManyToRepo"
@@ -425,69 +263,69 @@ async function handlePickVersionImportProject(projectId: string) {
           @uninstall-skill="handleLibraryUninstallSkill"
           @compare-versions="handleCompareVersions"
           @create-version="handleOpenCreateVersionFromLibrary"
-          @set-default-version="setDefaultVersion"
-          @rename-version="renameVersion"
-          @delete-version="(skillId, versionId) => deleteVersion(skillId, versionId, 'soft')"
+          @set-default-version="version.setDefaultVersion"
+          @rename-version="version.renameVersion"
+          @delete-version="(skillId: string, versionId: string) => version.deleteVersion(skillId, versionId, 'soft')"
         />
       </template>
 
       <template v-else-if="activeTab === 'market'">
         <MarketPanel
-          v-model:query="query"
-          :loading="loading"
-          :results="results"
-          :has-more="hasMore"
-          :installing-id="installingId"
-          :updating-id="updatingId"
-          :local-skill-name-set="localSkillNameSet"
-          :market-configs="marketConfigs"
-          :market-statuses="marketStatuses"
-          :enabled-markets="enabledMarkets"
-          :download-queue="downloadQueue"
-          :recent-task-status="recentTaskStatus"
-          @search="searchMarketplace(true)"
-          @refresh="searchMarketplace(true, true)"
-          @loadMore="searchMarketplace(false)"
-          @download="downloadSkill"
-          @update="updateSkill"
-          @saveConfigs="saveMarketConfigs"
+          v-model:query="market.query"
+          :loading="market.loading"
+          :results="market.results"
+          :has-more="market.hasMore"
+          :installing-id="install.installingId"
+          :updating-id="install.updatingId"
+          :local-skill-name-set="library.localSkillNameSet"
+          :market-configs="market.marketConfigs"
+          :market-statuses="market.marketStatuses"
+          :enabled-markets="market.enabledMarkets"
+          :download-queue="market.downloadQueue"
+          :recent-task-status="market.recentTaskStatus"
+          @search="market.searchMarketplace(true)"
+          @refresh="market.searchMarketplace(true, true)"
+          @loadMore="market.searchMarketplace(false)"
+          @download="market.downloadSkill"
+          @update="market.updateSkill"
+          @saveConfigs="market.saveMarketConfigs"
         />
       </template>
 
       <template v-else-if="activeTab === 'ide'">
         <IdePanel
-          :ide-options="ideOptions"
-          :selected-ide-filter="selectedIdeFilter"
-          :custom-ide-name="customIdeName"
-          :custom-ide-dir="customIdeDir"
-          :custom-ide-options="customIdeOptions"
-          :filtered-ide-skills="filteredIdeSkills"
-          :local-loading="localLoading"
-          @update:selected-ide-filter="selectedIdeFilter = $event"
-          @update:custom-ide-name="customIdeName = $event"
-          @update:custom-ide-dir="customIdeDir = $event"
-          @add-custom-ide="addCustomIde"
-          @remove-custom-ide="removeCustomIde"
-          @open-dir="openSkillDirectory"
-          @adopt="adoptIdeSkill"
-          @adopt-many="adoptManyIdeSkills"
-          @uninstall="openUninstallModal"
-          @uninstall-many="openUninstallManyModal"
+          :ide-options="ide.ideOptions"
+          :selected-ide-filter="ide.selectedIdeFilter"
+          :custom-ide-name="ide.customIdeName"
+          :custom-ide-dir="ide.customIdeDir"
+          :custom-ide-options="ide.customIdeOptions"
+          :filtered-ide-skills="ide.filteredIdeSkills"
+          :local-loading="library.localLoading"
+          @update:selected-ide-filter="ide.selectedIdeFilter = $event"
+          @update:custom-ide-name="ide.customIdeName = $event"
+          @update:custom-ide-dir="ide.customIdeDir = $event"
+          @add-custom-ide="ide.addCustomIde"
+          @remove-custom-ide="ide.removeCustomIde"
+          @open-dir="library.openSkillDirectory"
+          @adopt="ide.adoptIdeSkill"
+          @adopt-many="ide.adoptManyIdeSkills"
+          @uninstall="uninstall.openUninstallModal"
+          @uninstall-many="uninstall.openUninstallManyModal"
         />
       </template>
 
       <template v-else-if="activeTab === 'projects'">
         <ProjectsPanel
-          :projects="projects"
-          :selected-project-id="selectedProjectId"
-          :local-skills="localSkills"
-          :ide-options="ideOptions"
-          :project-skill-snapshots="projectSkillSnapshots"
-          :local-loading="localLoading"
+          :projects="project.projects"
+          :selected-project-id="project.selectedProjectId"
+          :local-skills="library.localSkills"
+          :ide-options="ide.ideOptions"
+          :project-skill-snapshots="project.projectSkillSnapshots"
+          :local-loading="library.localLoading"
           @add-project="openProjectAddModal"
           @remove-project="handleRemoveProject"
           @select-project="handleSelectProject"
-          @configure-project="(id) => { const project = projects.find((item) => item.id === id); if (project) openProjectConfigModal(project); }"
+          @configure-project="(id: string) => { const p = project.projects.find((item) => item.id === id); if (p) openProjectConfigModal(p); }"
           @export-skills="handleExportSkills"
           @import-skills="handleImportSkills"
         />
@@ -498,36 +336,36 @@ async function handlePickVersionImportProject(projectId: string) {
       </template>
     </main>
 
-    <InstallModal :visible="showInstallModal" :ide-options="ideOptions" :projects="projects" @confirm="confirmInstallToIde" @cancel="closeInstallModal" />
-    <UninstallModal :visible="showUninstallModal" :target-name="uninstallTargetName" :mode="uninstallMode" @confirm="confirmUninstall" @cancel="cancelUninstall" />
+    <InstallModal :visible="install.showInstallModal" :ide-options="ide.ideOptions" :projects="project.projects" @confirm="install.confirmInstallToIde" @cancel="install.closeInstallModal" />
+    <UninstallModal :visible="uninstall.showUninstallModal" :target-name="uninstall.uninstallTargetName" :mode="uninstall.uninstallMode" @confirm="uninstall.confirmUninstall" @cancel="uninstall.cancelUninstall" />
     <ProjectAddModal :visible="showProjectAddModal" @close="closeProjectAddModal" @confirm="handleProjectAddConfirm" />
-    <ProjectConfigModal :visible="showProjectConfigModal" :project="configuringProject" :ide-options="ideOptions" @close="closeProjectConfigModal" @save="handleProjectConfigSave" />
-    <ConflictResolutionModal :show="showConflictModal" :skill="currentConflictSkill" :conflict-analysis="currentConflictAnalysis" @close="closeConflictModal" @resolve="handleConflictResolution" />
-    <ProjectSkillImportModal :show="showProjectExportModal" :scan-result="projectSkillScanResult" @close="closeProjectExportModal" @import="handleImportSelected" @resolve-conflict="handleResolveConflictFromImport" />
-    <ImportToProjectModal :show="showProjectImportModal" :project="configuringProject" :local-skills="localSkills" @close="closeProjectImportModal" @clone="handleCloneSkillsToProject" />
+    <ProjectConfigModal :visible="showProjectConfigModal" :project="configuringProject" :ide-options="ide.ideOptions" @close="closeProjectConfigModal" @save="handleProjectConfigSave" />
+    <ConflictResolutionModal :show="project.showConflictModal" :skill="project.currentConflictSkill" :conflict-analysis="version.currentConflictAnalysis" @close="project.closeConflictModal" @resolve="handleConflictResolution" />
+    <ProjectSkillImportModal :show="showProjectExportModal" :scan-result="project.projectSkillScanResult" @close="closeProjectExportModal" @import="handleImportSelected" @resolve-conflict="handleResolveConflictFromImport" />
+    <ImportToProjectModal :show="showProjectImportModal" :project="configuringProject" :local-skills="library.localSkills" @close="closeProjectImportModal" @clone="handleCloneSkillsToProject" />
     <VersionManagerModal
-      :show="showVersionManagerModal"
-      :skill-package="currentSkillPackage"
-      :current-skill-path="currentManagedSkillPath"
-      :selected-source-path="selectedCreateVersionSourcePath"
-      :projects="projects"
-      :project-skills="versionImportProjectSkills"
-      :selected-project-id="versionImportProjectId"
-      :project-skills-loading="versionImportProjectSkillsLoading"
-      :loading="versionLoading"
-      @close="closeVersionManagerModal"
-      @rename="renameVersion"
-      @delete="deleteVersion"
-      @set-default="setDefaultVersion"
+      :show="version.showVersionManagerModal"
+      :skill-package="version.currentSkillPackage"
+      :current-skill-path="version.currentManagedSkillPath"
+      :selected-source-path="version.selectedCreateVersionSourcePath"
+      :projects="project.projects"
+      :project-skills="version.versionImportProjectSkills"
+      :selected-project-id="version.versionImportProjectId"
+      :project-skills-loading="version.versionImportProjectSkillsLoading"
+      :loading="version.versionLoading"
+      @close="version.closeVersionManagerModal"
+      @rename="version.renameVersion"
+      @delete="version.deleteVersion"
+      @set-default="version.setDefaultVersion"
       @compare="handleCompareVersions"
       @create-version="handleCreateVersion"
       @pick-source-path="handlePickSourcePath"
       @pick-project="handlePickVersionImportProject"
-      @create-variant="createVariant"
-      @update-variant="updateVariant"
-      @delete-variant="deleteVariant"
+      @create-variant="version.createVariant"
+      @update-variant="version.updateVariant"
+      @delete-variant="version.deleteVariant"
     />
-    <VersionDiffModal :show="showVersionDiffModal" :diff="currentVersionDiff || currentDiff" :from-version="comparingFromVersion" :to-version="comparingToVersion" @close="closeVersionDiffModal" />
+    <VersionDiffModal :show="version.showVersionDiffModal" :diff="version.currentVersionDiff || version.currentDiff" :from-version="version.comparingFromVersion" :to-version="version.comparingToVersion" @close="version.closeVersionDiffModal" />
     <Toast />
     <LoadingOverlay :visible="displayBusy" :text="displayBusyText" />
   </div>

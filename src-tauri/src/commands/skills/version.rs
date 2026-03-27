@@ -1,5 +1,5 @@
 use super::{
-    build_skill_diff, build_skill_version, collect_skills_from_dir,
+    build_skill_diff, build_skill_version, collect_skills_from_dir, now_timestamp,
     package_from_skill_dir, read_package_state, read_version_sidecar,
     write_package_state, write_version_metadata, write_version_sidecar,
     StoredVersionMetadata, VERSION_METADATA_FILE,
@@ -67,6 +67,7 @@ pub fn create_skill_version(request: CreateVersionRequest) -> Result<CreateVersi
         source_url: request.source_url.clone(),
         parent_version: request.parent_version.clone().or(Some(reference_version.id)),
         deleted: Some(false),
+        created_at: Some(now_timestamp()),
     };
     write_version_sidecar(&destination_path, &sidecar)?;
 
@@ -239,12 +240,19 @@ pub fn delete_skill_version(
         DeleteStrategy::Archive => {
             let archive_root = home.join(".qing-skill-manager/archive");
             fs::create_dir_all(&archive_root).map_err(|err| err.to_string())?;
-            let archive_path = archive_root.join(
-                skill_path
-                    .file_name()
-                    .and_then(|value| value.to_str())
-                    .unwrap_or("skill-version"),
-            );
+            let dir_name = skill_path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or("skill-version");
+            let mut archive_path = archive_root.join(dir_name);
+            // Avoid collision with existing archives
+            if archive_path.exists() {
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                archive_path = archive_root.join(format!("{}-{}", dir_name, timestamp));
+            }
             fs::rename(&skill_path, &archive_path).map_err(|err| err.to_string())?;
             Ok(DeleteVersionResponse {
                 success: true,
