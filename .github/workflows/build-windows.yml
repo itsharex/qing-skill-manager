@@ -46,8 +46,8 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     if: >-
-      inputs.platforms == 'all' ||
-      inputs.platforms == matrix.platform
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.platforms == 'all' || inputs.platforms == matrix.platform)
 
     steps:
       - name: Checkout code
